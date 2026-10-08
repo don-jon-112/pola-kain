@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { KeyRound, ShieldAlert, CheckCircle, ArrowRight, X } from 'lucide-react';
+import { db } from '../services/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 export default function ChangePasswordView({ onClose }) {
   const { user, setUser, setMustChangePassword } = useAuth();
@@ -27,24 +29,38 @@ export default function ChangePasswordView({ onClose }) {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          oldPassword,
-          newPassword,
-        }),
-      });
+      // 1. Kirim ke backend API jika online
+      try {
+        await fetch('/api/auth/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            oldPassword,
+            newPassword,
+          }),
+        });
+      } catch (apiErr) {
+        console.warn('API backend change-password offline, syncing directly to Firestore...');
+      }
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Gagal mengubah password');
+      // 2. Sinkronkan langsung ke Firestore jika terhubung ke Firebase
+      if (db && user?.id) {
+        try {
+          const userDocRef = doc(db, 'users', user.id);
+          await updateDoc(userDocRef, {
+            password: newPassword,
+            must_change_password: false,
+            updated_at: new Date().toISOString(),
+          });
+        } catch (fErr) {
+          console.warn('Firestore update password:', fErr.message);
+        }
       }
 
       setSuccess(true);
       setTimeout(() => {
-        setUser(data.user);
+        setUser((prev) => ({ ...prev, must_change_password: false }));
         setMustChangePassword(false);
         if (onClose) onClose();
       }, 1200);

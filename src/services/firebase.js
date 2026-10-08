@@ -130,3 +130,42 @@ export const COLLECTIONS = {
   EMPLOYEES: 'employees',
   FINANCE: 'financial_transactions',
 };
+
+// Auto-seed default admin accounts if users collection is empty in Firestore
+export const ensureDefaultAdminInFirestore = async () => {
+  if (!db) return;
+  try {
+    const usersColl = collection(db, 'users');
+    const snap = await getDocs(usersColl);
+    if (snap.empty) {
+      console.log('🌱 Firestore users collection is empty. Seeding default Admin & Owner accounts...');
+      await setDoc(doc(db, 'users', 'usr_superadmin'), {
+        id: 'usr_superadmin',
+        username: 'superadmin',
+        email: 'superadmin@konveksi.id',
+        password: 'password123',
+        name: 'Super Admin Utama',
+        role: 'SUPER_ADMIN',
+        active: true,
+        must_change_password: false,
+        created_at: new Date().toISOString(),
+      });
+
+      await setDoc(doc(db, 'users', 'usr_owner'), {
+        id: 'usr_owner',
+        username: 'owner',
+        email: 'owner@konveksi.id',
+        password: 'password123',
+        name: 'Pak Hendra (Owner)',
+        role: 'OWNER',
+        active: true,
+        must_change_password: false,
+        created_at: new Date().toISOString(),
+      });
+      console.log('✅ Default accounts (superadmin / owner with password: password123) successfully seeded to Firestore!');
+    }
+  } catch (err) {
+    console.warn('Note on Firestore users check/seed:', err.message);
+  }
+};
+

@@ -12,13 +12,16 @@ export default function ProductsView() {
   // Form states
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-  const [category, setCategory] = useState('Seragam Putih');
+  const [category, setCategory] = useState('TK');
   const [description, setDescription] = useState('');
-  const [singlePrice, setSinglePrice] = useState('85000');
+  const [singlePrice, setSinglePrice] = useState('');
   const [hasSize, setHasSize] = useState(true);
   const [sizesList, setSizesList] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
+
+  const CATEGORIES = ['TK', 'SD', 'SMP', 'SMA', 'Aksesoris'];
 
   const getProductPriceDisplay = (prod) => {
     if (!prod.has_size || !prod.sizes || prod.sizes.length === 0) {
@@ -60,18 +63,11 @@ export default function ProductsView() {
     setEditingProduct(null);
     setName('');
     setCode('');
-    setCategory('Seragam Putih');
+    setCategory('TK');
     setDescription('');
-    setSinglePrice('85000');
+    setSinglePrice('');
     setHasSize(true);
-    setSizesList([
-      { size_code: '26', size_name: 'Size 26', price: '85000' },
-      { size_code: '27', size_name: 'Size 27', price: '85000' },
-      { size_code: '28', size_name: 'Size 28', price: '85000' },
-      { size_code: '29', size_name: 'Size 29', price: '85000' },
-      { size_code: '30', size_name: 'Size 30', price: '85000' },
-      { size_code: '31', size_name: 'Size 31 (Jumbo)', price: '90000' },
-    ]);
+    setSizesList([]); // Default kosong tanpa ukuran bawaan
     setError('');
     setShowModal(true);
   };
@@ -80,14 +76,14 @@ export default function ProductsView() {
     setEditingProduct(prod);
     setName(prod.name);
     setCode(prod.code);
-    setCategory(prod.category);
-    setDescription(prod.description);
-    setSinglePrice(prod.price || '85000');
+    setCategory(prod.category || 'TK');
+    setDescription(prod.description || '');
+    setSinglePrice(prod.price ? String(prod.price) : '');
     setHasSize(prod.has_size);
     const existingSizes = (prod.sizes || []).map((s) => ({
       size_code: s.size_code,
       size_name: s.size_name || `Size ${s.size_code}`,
-      price: s.price !== undefined && s.price !== null ? s.price : prod.price,
+      price: s.price !== undefined && s.price !== null ? String(s.price) : String(prod.price || ''),
     }));
     setSizesList(existingSizes);
     setError('');
@@ -95,8 +91,8 @@ export default function ProductsView() {
   };
 
   const handleAddSizeRow = () => {
-    const lastPrice = sizesList.length > 0 ? sizesList[sizesList.length - 1].price : '85000';
-    setSizesList([...sizesList, { size_code: '', size_name: '', price: lastPrice }]);
+    // Biarkan nilai baru kosong untuk diisi oleh user
+    setSizesList([...sizesList, { size_code: '', size_name: '', price: '' }]);
   };
 
   const handleRemoveSizeRow = (idx) => {
@@ -199,6 +195,11 @@ export default function ProductsView() {
     }
   };
 
+  const filteredProducts = products.filter((prod) => {
+    if (selectedCategoryFilter === 'ALL') return true;
+    return prod.category === selectedCategoryFilter;
+  });
+
   return (
     <div className="content-body">
       <div className="card">
@@ -208,7 +209,7 @@ export default function ProductsView() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '20px',
+            marginBottom: '16px',
             flexWrap: 'wrap',
             gap: '12px',
           }}
@@ -224,6 +225,34 @@ export default function ProductsView() {
             <Plus size={16} />
             <span>Tambah Produk Baru</span>
           </button>
+        </div>
+
+        {/* Filter Tabs Kategori */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.825rem', fontWeight: 600, color: '#64748b', marginRight: '4px' }}>
+            Filter Kategori:
+          </span>
+          {['ALL', ...CATEGORIES].map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              className={`btn btn-sm ${selectedCategoryFilter === cat ? 'btn-primary' : 'btn-secondary'}`}
+              style={{
+                padding: '4px 12px',
+                fontSize: '0.8rem',
+                borderRadius: '20px',
+                fontWeight: selectedCategoryFilter === cat ? 700 : 500,
+              }}
+              onClick={() => setSelectedCategoryFilter(cat)}
+            >
+              {cat === 'ALL' ? 'Semua' : cat}
+              {cat !== 'ALL' && (
+                <span style={{ opacity: 0.75, marginLeft: '4px', fontSize: '0.75rem' }}>
+                  ({products.filter((p) => p.category === cat).length})
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
         {/* Table */}
@@ -249,19 +278,26 @@ export default function ProductsView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {products.map((prod) => (
-                      <tr key={prod.id} style={{ opacity: prod.active ? 1 : 0.6 }}>
-                        <td>
-                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{prod.name}</div>
-                          <div className="font-mono" style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            {prod.code}
-                          </div>
+                    {filteredProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                          Tidak ada produk dalam kategori <strong>{selectedCategoryFilter}</strong>.
                         </td>
-                        <td>
-                          <span className="badge" style={{ background: '#f1f5f9', color: '#475569' }}>
-                            {prod.category}
-                          </span>
-                        </td>
+                      </tr>
+                    ) : (
+                      filteredProducts.map((prod) => (
+                        <tr key={prod.id} style={{ opacity: prod.active ? 1 : 0.6 }}>
+                          <td>
+                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{prod.name}</div>
+                            <div className="font-mono" style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                              {prod.code}
+                            </div>
+                          </td>
+                          <td>
+                            <span className="badge" style={{ background: '#f1f5f9', color: '#475569' }}>
+                              {prod.category}
+                            </span>
+                          </td>
                         <td>
                           {prod.has_size ? (
                             <span style={{ fontSize: '0.8rem', color: '#4f46e5', fontWeight: 600 }}>
@@ -343,7 +379,8 @@ export default function ProductsView() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    ))
+                  )}
                   </tbody>
                 </table>
               </div>
@@ -351,8 +388,13 @@ export default function ProductsView() {
 
             {/* Mobile Cards View */}
             <div className="mobile-only-cards">
-              {products.map((prod) => (
-                <div key={prod.id} className="mobile-data-card" style={{ opacity: prod.active ? 1 : 0.65 }}>
+              {filteredProducts.length === 0 ? (
+                <div style={{ padding: '32px 16px', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '12px' }}>
+                  Tidak ada produk dalam kategori <strong>{selectedCategoryFilter}</strong>.
+                </div>
+              ) : (
+                filteredProducts.map((prod) => (
+                  <div key={prod.id} className="mobile-data-card" style={{ opacity: prod.active ? 1 : 0.65 }}>
                   <div className="mobile-data-card-header">
                     <div>
                       <div className="mobile-data-card-code">{prod.code}</div>
@@ -435,7 +477,8 @@ export default function ProductsView() {
                     </button>
                   </div>
                 </div>
-              ))}
+              ))
+            )}
             </div>
           </>
         )}
@@ -503,12 +546,11 @@ export default function ProductsView() {
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
                     >
-                      <option value="Seragam Putih">Seragam Putih</option>
-                      <option value="Seragam Batik">Seragam Batik</option>
-                      <option value="Seragam Pramuka">Seragam Pramuka</option>
-                      <option value="Seragam Olahraga">Seragam Olahraga</option>
-                      <option value="Aksesoris">Aksesoris (Dasi, Topi, Sabuk)</option>
-                      <option value="Lainnya">Lainnya</option>
+                      <option value="TK">TK</option>
+                      <option value="SD">SD</option>
+                      <option value="SMP">SMP</option>
+                      <option value="SMA">SMA</option>
+                      <option value="Aksesoris">Aksesoris</option>
                     </select>
                   </div>
                 </div>
@@ -521,7 +563,15 @@ export default function ProductsView() {
                       type="number"
                       min="0"
                       step="500"
-                      className="form-input font-mono"
+                      className="form-input text-right"
+                      style={{
+                        height: '38px',
+                        fontFamily: 'inherit',
+                        fontWeight: 700,
+                        fontSize: '0.95rem',
+                        color: '#0f172a',
+                        letterSpacing: '0.02em',
+                      }}
                       placeholder="Contoh: 85000"
                       value={singlePrice}
                       onChange={(e) => setSinglePrice(e.target.value)}
@@ -564,8 +614,8 @@ export default function ProductsView() {
                         </div>
 
                         {sizesList.length === 0 ? (
-                          <div style={{ padding: '16px', background: '#ffffff', borderRadius: '8px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
-                            Belum ada ukuran. Klik 'Tambah Ukuran' untuk menambahkan varian ukuran & harga.
+                          <div style={{ padding: '24px 16px', background: '#ffffff', borderRadius: '8px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '1px dashed #cbd5e1' }}>
+                            Ukuran saat ini masih kosong. Klik tombol <strong>'Tambah Ukuran'</strong> di atas untuk menambahkan ukuran & harganya.
                           </div>
                         ) : (
                           <div style={{ maxHeight: '260px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#ffffff' }}>
@@ -574,7 +624,7 @@ export default function ProductsView() {
                                 <tr>
                                   <th style={{ padding: '8px 10px' }}>Kode Ukuran</th>
                                   <th style={{ padding: '8px 10px' }}>Nama Label</th>
-                                  <th style={{ padding: '8px 10px', width: '150px' }}>Harga Jual (Rp)</th>
+                                  <th style={{ padding: '8px 10px', width: '160px' }}>Harga Jual (Rp)</th>
                                   <th style={{ padding: '8px 10px', width: '45px', textAlign: 'center' }}></th>
                                 </tr>
                               </thead>
@@ -585,7 +635,7 @@ export default function ProductsView() {
                                       <input
                                         type="text"
                                         className="form-input"
-                                        style={{ height: '32px', fontSize: '0.8rem', fontWeight: 600 }}
+                                        style={{ height: '34px', fontSize: '0.85rem', fontWeight: 600 }}
                                         placeholder="Misal: 31 atau XL"
                                         value={sz.size_code}
                                         onChange={(e) => handleSizeItemChange(idx, 'size_code', e.target.value)}
@@ -596,7 +646,7 @@ export default function ProductsView() {
                                       <input
                                         type="text"
                                         className="form-input"
-                                        style={{ height: '32px', fontSize: '0.8rem' }}
+                                        style={{ height: '34px', fontSize: '0.85rem' }}
                                         placeholder={`Size ${sz.size_code || ''}`}
                                         value={sz.size_name}
                                         onChange={(e) => handleSizeItemChange(idx, 'size_name', e.target.value)}
@@ -607,9 +657,16 @@ export default function ProductsView() {
                                         type="number"
                                         min="0"
                                         step="500"
-                                        className="form-input font-mono text-right"
-                                        style={{ height: '32px', fontSize: '0.8rem', fontWeight: 700 }}
-                                        placeholder="85000"
+                                        className="form-input text-right"
+                                        style={{
+                                          height: '34px',
+                                          fontFamily: 'inherit',
+                                          fontSize: '0.875rem',
+                                          fontWeight: 700,
+                                          color: '#0f172a',
+                                          letterSpacing: '0.02em',
+                                        }}
+                                        placeholder="Masukkan harga"
                                         value={sz.price}
                                         onChange={(e) => handleSizeItemChange(idx, 'price', e.target.value)}
                                         required
@@ -633,7 +690,7 @@ export default function ProductsView() {
                           </div>
                         )}
                         <div className="form-help" style={{ marginTop: '6px' }}>
-                          💡 Harga ditentukan langsung pada masing-masing ukuran (misal: ukuran 26-30 seharga <strong>Rp 85.000</strong>, dan ukuran 31 seharga <strong>Rp 90.000</strong>).
+                          💡 Harga ditentukan langsung pada masing-masing ukuran produk.
                         </div>
                       </div>
                     </div>
@@ -643,8 +700,17 @@ export default function ProductsView() {
                 <div className="form-group">
                   <label className="form-label">Deskripsi & Spesifikasi Bahan</label>
                   <textarea
-                    className="form-textarea"
-                    rows="2"
+                    className="form-input"
+                    rows={5}
+                    style={{
+                      resize: 'none',
+                      minHeight: '115px',
+                      height: '115px',
+                      lineHeight: '1.5',
+                      padding: '10px 12px',
+                      fontFamily: 'inherit',
+                      fontSize: '0.85rem',
+                    }}
                     placeholder="Contoh: Bahan TC Oxford tebal adem, kancing kuat, jahitan rapi."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}

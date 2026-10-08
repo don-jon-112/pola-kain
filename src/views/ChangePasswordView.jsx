@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { KeyRound, ShieldAlert, CheckCircle, ArrowRight, X } from 'lucide-react';
+import { KeyRound, ShieldAlert, CheckCircle, ArrowRight, X, Eye, EyeOff, Lock } from 'lucide-react';
 import { db } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { hashPassword } from '../utils/crypto';
@@ -13,6 +13,19 @@ export default function ChangePasswordView({ onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  // Show/Hide password states
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showAllPasswords, setShowAllPasswords] = useState(false);
+
+  const handleToggleShowAll = (checked) => {
+    setShowAllPasswords(checked);
+    setShowOldPassword(checked);
+    setShowNewPassword(checked);
+    setShowConfirmPassword(checked);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -165,38 +178,146 @@ export default function ChangePasswordView({ onClose }) {
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label">Password Lama / Saat Ini</label>
-            <input
-              type="password"
-              className="form-input"
-              placeholder="Masukkan password lama"
-              value={oldPassword}
-              onChange={(e) => setOldPassword(e.target.value)}
-              required
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showOldPassword ? 'text' : 'password'}
+                className="form-input"
+                style={{ paddingLeft: '38px', paddingRight: '40px' }}
+                placeholder="Masukkan password lama"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                required
+              />
+              <Lock
+                size={18}
+                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowOldPassword(!showOldPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title={showOldPassword ? 'Sembunyikan password' : 'Lihat password'}
+              >
+                {showOldPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <div className="form-group">
             <label className="form-label">Password Baru (Min. 6 Karakter)</label>
-            <input
-              type="password"
-              className="form-input"
-              placeholder="Buat password baru yang aman"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                className="form-input"
+                style={{ paddingLeft: '38px', paddingRight: '40px' }}
+                placeholder="Buat password baru yang aman"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+              <Lock
+                size={18}
+                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title={showNewPassword ? 'Sembunyikan password' : 'Lihat password'}
+              >
+                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <div className="form-group">
             <label className="form-label">Konfirmasi Password Baru</label>
-            <input
-              type="password"
-              className="form-input"
-              placeholder="Ketik ulang password baru"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                className="form-input"
+                style={{ paddingLeft: '38px', paddingRight: '40px' }}
+                placeholder="Ketik ulang password baru"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+              <Lock
+                size={18}
+                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title={showConfirmPassword ? 'Sembunyikan password' : 'Lihat password'}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Menu / Opsi Tampilkan Semua Password */}
+          <div style={{ marginBottom: '16px' }}>
+            <label
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                fontSize: '0.825rem',
+                color: '#475569',
+                userSelect: 'none',
+                fontWeight: 500,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showAllPasswords}
+                onChange={(e) => handleToggleShowAll(e.target.checked)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#4f46e5' }}
+              />
+              <span>Tampilkan semua password</span>
+            </label>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>

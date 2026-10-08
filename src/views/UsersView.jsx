@@ -9,6 +9,8 @@ import {
   X,
   AlertCircle,
   Copy,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
@@ -46,6 +48,7 @@ export default function UsersView() {
   // Custom password states
   const [selectedUserForPassword, setSelectedUserForPassword] = useState(null);
   const [customPasswordInput, setCustomPasswordInput] = useState('');
+  const [showCustomPassword, setShowCustomPassword] = useState(true);
   const [customPasswordLoading, setCustomPasswordLoading] = useState(false);
   const [customPasswordError, setCustomPasswordError] = useState('');
 
@@ -690,15 +693,39 @@ export default function UsersView() {
                 )}
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Password Baru (Min. 6 Karakter)</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Ketik password baru untuk akun ini"
-                    value={customPasswordInput}
-                    onChange={(e) => setCustomPasswordInput(e.target.value)}
-                    required
-                    autoFocus
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showCustomPassword ? 'text' : 'password'}
+                      className="form-input"
+                      style={{ paddingRight: '40px' }}
+                      placeholder="Ketik password baru untuk akun ini"
+                      value={customPasswordInput}
+                      onChange={(e) => setCustomPasswordInput(e.target.value)}
+                      required
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomPassword(!showCustomPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#64748b',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      title={showCustomPassword ? 'Sembunyikan password' : 'Lihat password'}
+                    >
+                      {showCustomPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                   <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '6px' }}>
                     Password akan langsung aktif dan pengguna dapat login dengan password ini.
                   </div>

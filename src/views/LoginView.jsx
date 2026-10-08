@@ -168,7 +168,7 @@ export default function LoginView() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   className="form-input"
-                  style={{ paddingLeft: '38px', paddingRight: '38px' }}
+                  style={{ paddingLeft: '38px', paddingRight: '40px' }}
                   placeholder="Masukkan password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -176,7 +176,7 @@ export default function LoginView() {
                 />
                 <Lock
                   size={18}
-                  style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }}
+                  style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
                 />
                 <button
                   type="button"
@@ -184,17 +184,42 @@ export default function LoginView() {
                   style={{
                     position: 'absolute',
                     right: '12px',
-                    top: '11px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
                     background: 'none',
                     border: 'none',
-                    color: '#94a3b8',
+                    color: '#64748b',
                     cursor: 'pointer',
-                    padding: 0,
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                   title={showPassword ? 'Sembunyikan password' : 'Lihat password'}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
+              </div>
+              <div style={{ marginTop: '8px' }}>
+                <label
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.825rem',
+                    color: '#64748b',
+                    userSelect: 'none',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={showPassword}
+                    onChange={(e) => setShowPassword(e.target.checked)}
+                    style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#4f46e5' }}
+                  />
+                  <span>Tampilkan Password</span>
+                </label>
               </div>
             </div>
 

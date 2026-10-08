@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { KeyRound, ShieldAlert, CheckCircle, ArrowRight, X, Eye, EyeOff, Lock } from 'lucide-react';
 import { db } from '../services/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
-import { hashPassword } from '../utils/crypto';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { hashPassword, verifyPassword } from '../utils/crypto';
 
 export default function ChangePasswordView({ onClose }) {
   const { user, setUser, setMustChangePassword } = useAuth();
@@ -31,37 +31,100 @@ export default function ChangePasswordView({ onClose }) {
     e.preventDefault();
     setError('');
 
-    if (newPassword.length < 6) {
+    const cleanOld = oldPassword.trim();
+    const cleanNew = newPassword.trim();
+    const cleanConfirm = confirmPassword.trim();
+
+    if (!cleanOld) {
+      setError('Password lama / saat ini wajib diisi');
+      return;
+    }
+
+    if (cleanNew.length < 6) {
       setError('Password baru minimal 6 karakter');
       return;
     }
 
-    if (newPassword !== confirmPassword) {
+    if (cleanNew === cleanOld) {
+      setError('Password baru tidak boleh sama dengan password lama');
+      return;
+    }
+
+    if (cleanNew !== cleanConfirm) {
       setError('Konfirmasi password baru tidak cocok');
       return;
     }
 
     setLoading(true);
     try {
-      // 1. Kirim ke backend API jika online
+      let isOldPasswordVerified = false;
+
+      // 1. Verifikasi kecocokan password lama ke Cloud Firestore
+      if (db && user?.id) {
+        try {
+          const userDocRef = doc(db, 'users', user.id);
+          const snap = await getDoc(userDocRef);
+          if (snap.exists()) {
+            const currentData = snap.data();
+            const isMatch = await verifyPassword(cleanOld, currentData.password);
+            if (!isMatch) {
+              throw new Error('Password lama tidak sesuai. Silakan periksa kembali password Anda.');
+            }
+            isOldPasswordVerified = true;
+          }
+        } catch (fErr) {
+          if (fErr.message.includes('Password lama tidak sesuai')) {
+            throw fErr;
+          }
+          console.warn('Firestore read check skipped/offline:', fErr.message);
+        }
+      }
+
+      // 2. Verifikasi dan kirim ke backend API Express
       try {
-        await fetch('/api/auth/change-password', {
+        const res = await fetch('/api/auth/change-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: user.id,
-            oldPassword,
-            newPassword,
+            oldPassword: cleanOld,
+            newPassword: cleanNew,
           }),
         });
+
+        const text = await res.text();
+        let apiData = {};
+        try {
+          apiData = text ? JSON.parse(text) : {};
+        } catch {
+          apiData = {};
+        }
+
+        if (!res.ok) {
+          throw new Error(apiData.error || 'Password lama tidak sesuai. Silakan masukkan password yang benar.');
+        }
+        isOldPasswordVerified = true;
       } catch (apiErr) {
-        console.warn('API backend change-password offline, syncing directly to Firestore...');
+        if (
+          apiErr.message.includes('Password lama') ||
+          apiErr.message.includes('tidak sesuai') ||
+          apiErr.message.includes('wajib diisi') ||
+          apiErr.message.includes('minimal')
+        ) {
+          throw apiErr;
+        }
+        console.warn('API backend offline, melanjutkan update Firestore...');
       }
 
-      // 2. Sinkronkan langsung ke Firestore jika terhubung ke Firebase (dienkripsi dengan bcrypt)
+      // Jika password lama tidak terverifikasi sama sekali
+      if (!isOldPasswordVerified) {
+        throw new Error('Password lama tidak dapat diverifikasi. Pastikan password yang Anda masukkan benar.');
+      }
+
+      // 3. Simpan password baru yang terenkripsi ke Firestore
       if (db && user?.id) {
         try {
-          const hashedPassword = await hashPassword(newPassword);
+          const hashedPassword = await hashPassword(cleanNew);
           const userDocRef = doc(db, 'users', user.id);
           await updateDoc(userDocRef, {
             password: hashedPassword,
@@ -80,7 +143,7 @@ export default function ChangePasswordView({ onClose }) {
         if (onClose) onClose();
       }, 1200);
     } catch (err) {
-      setError(err.message || 'Terjadi kesalahan sistem');
+      setError(err.message || 'Terjadi kesalahan sistem saat memperbarui password');
     } finally {
       setLoading(false);
     }

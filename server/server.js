@@ -80,8 +80,8 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.post('/api/auth/change-password', async (req, res) => {
   const { userId, oldPassword, newPassword } = req.body;
-  if (!userId || !newPassword) {
-    return res.status(400).json({ error: 'Data tidak lengkap' });
+  if (!userId || !oldPassword || !newPassword) {
+    return res.status(400).json({ error: 'Password lama dan password baru wajib diisi' });
   }
 
   if (newPassword.length < 6) {
@@ -93,16 +93,14 @@ app.post('/api/auth/change-password', async (req, res) => {
     return res.status(404).json({ error: 'User tidak ditemukan' });
   }
 
-  // Jika bukan login pertama kali, verifikasi password lama
-  if (!user.must_change_password && oldPassword) {
-    const isBcrypt = /^\$2[aby]\$\d{2}\$/.test(user.password);
-    const isOldValid = isBcrypt
-      ? await bcrypt.compare(oldPassword.trim(), user.password)
-      : user.password === oldPassword.trim();
+  // SELALU verifikasi kecocokan password lama
+  const isBcrypt = /^\$2[aby]\$\d{2}\$/.test(user.password);
+  const isOldValid = isBcrypt
+    ? await bcrypt.compare(oldPassword.trim(), user.password)
+    : user.password === oldPassword.trim();
 
-    if (!isOldValid) {
-      return res.status(400).json({ error: 'Password lama salah' });
-    }
+  if (!isOldValid) {
+    return res.status(400).json({ error: 'Password lama tidak sesuai. Silakan masukkan password saat ini yang benar.' });
   }
 
   // Enkripsi password baru dengan bcrypt

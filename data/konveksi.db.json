@@ -4,13 +4,14 @@
       "id": "usr_superadmin",
       "username": "superadmin",
       "email": "superadmin@konveksi.id",
-      "password": "$2b$10$echjqpwvtaTGFj/UDaDruuSa2vDap6kKWBQqryts.UMlv46N/ANWK",
+      "password": "$2b$10$Ky7GU7lRkINK42.uv.HsueHkalZK85Jv9sRz5WeSFipfAN1u2IUTS",
       "name": "Super Admin Utama",
       "role": "SUPER_ADMIN",
       "customer_id": null,
-      "must_change_password": true,
+      "must_change_password": false,
       "active": true,
-      "created_at": "2026-10-01T08:00:00Z"
+      "created_at": "2026-10-01T08:00:00Z",
+      "updated_at": "2026-10-08T17:32:06.504Z"
     },
     {
       "id": "usr_owner",

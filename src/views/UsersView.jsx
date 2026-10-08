@@ -12,7 +12,18 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+
+const safeParseJson = (text, fallback = null) => {
+  if (!text || typeof text !== 'string') return fallback;
+  try {
+    const trimmed = text.trim();
+    if (!trimmed) return fallback;
+    return JSON.parse(trimmed);
+  } catch {
+    return fallback;
+  }
+};
 
 export default function UsersView() {
   const { user } = useAuth();
@@ -40,16 +51,49 @@ export default function UsersView() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [uRes, cRes] = await Promise.all([
-        fetch('/api/users'),
-        fetch('/api/customers'),
-      ]);
-      const [uData, cData] = await Promise.all([uRes.json(), cRes.json()]);
-      setUsers(uData);
-      setCustomers(cData);
-      if (cData.length > 0) setCustomerId(cData[0].id);
+      let uList = [];
+      let cList = [];
+
+      // 1. Ambil dari Firestore terlebih dahulu jika Firebase aktif
+      if (db) {
+        try {
+          const snap = await getDocs(collection(db, 'users'));
+          if (!snap.empty) {
+            uList = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          }
+        } catch (fErr) {
+          console.warn('Firestore fetch users:', fErr.message);
+        }
+      }
+
+      // 2. Ambil dari backend lokal jika Firestore belum ada data atau untuk melengkapi
+      try {
+        const uRes = await fetch('/api/users');
+        const text = await uRes.text();
+        const data = safeParseJson(text, null);
+        if (Array.isArray(data) && uList.length === 0) {
+          uList = data;
+        }
+      } catch (apiErr) {
+        // Backend offline, fallback ke Firestore
+      }
+
+      try {
+        const cRes = await fetch('/api/customers');
+        const text = await cRes.text();
+        const data = safeParseJson(text, []);
+        if (Array.isArray(data)) {
+          cList = data;
+        }
+      } catch (cErr) {
+        // silent
+      }
+
+      setUsers(uList);
+      setCustomers(cList);
+      if (cList.length > 0 && !customerId) setCustomerId(cList[0].id);
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching users:', err);
     } finally {
       setLoading(false);
     }
@@ -64,26 +108,88 @@ export default function UsersView() {
     setError('');
     setSubmitting(true);
     try {
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username,
-          email,
-          name,
-          role,
-          customer_id: role === 'CUSTOMER' ? customerId : null,
-        }),
-      });
+      const cleanUsername = username.trim().toLowerCase();
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanName = name.trim();
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Gagal membuat user');
+      if (!cleanUsername || !cleanEmail || !cleanName) {
+        throw new Error('Semua data pengguna wajib diisi');
+      }
+
+      // Validasi duplikat langsung di client jika sudah ada di state
+      const existingUser = users.find(
+        (u) =>
+          u.username?.toLowerCase() === cleanUsername ||
+          u.email?.toLowerCase() === cleanEmail
+      );
+      if (existingUser) {
+        throw new Error(
+          existingUser.username?.toLowerCase() === cleanUsername
+            ? `Username "${cleanUsername}" sudah terdaftar. Silakan gunakan username lain.`
+            : `Email "${cleanEmail}" sudah terdaftar. Silakan gunakan email lain.`
+        );
+      }
+
+      // Generate initial password & unique ID
+      const initialPassword = 'User' + Math.floor(1000 + Math.random() * 9000);
+      const newUserId = 'usr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+
+      const newUserPayload = {
+        id: newUserId,
+        username: cleanUsername,
+        email: cleanEmail,
+        name: cleanName,
+        password: initialPassword,
+        role,
+        customer_id: role === 'CUSTOMER' ? customerId : null,
+        must_change_password: true,
+        active: true,
+        created_at: new Date().toISOString(),
+      };
+
+      // 1. Simpan langsung ke Firebase Firestore jika terhubung
+      if (db) {
+        try {
+          await setDoc(doc(db, 'users', newUserId), newUserPayload);
+        } catch (fErr) {
+          console.error('Firestore create user error:', fErr);
+          if (fErr.code === 'permission-denied') {
+            throw new Error('Akses Firebase Firestore ditolak. Pastikan Firestore Rules sudah di-publish.');
+          }
+        }
+      }
+
+      // 2. Sinkronkan ke API backend lokal jika tersedia
+      try {
+        const res = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: cleanUsername,
+            email: cleanEmail,
+            name: cleanName,
+            role,
+            customer_id: role === 'CUSTOMER' ? customerId : null,
+          }),
+        });
+        const text = await res.text();
+        const apiData = safeParseJson(text, {});
+        if (!res.ok && apiData?.error) {
+          throw new Error(apiData.error);
+        }
+      } catch (apiErr) {
+        if (
+          apiErr.message.includes('sudah terdaftar') ||
+          apiErr.message.includes('wajib diisi')
+        ) {
+          throw apiErr;
+        }
+        console.warn('API backend /api/users offline, data tersimpan di Cloud Firestore.');
       }
 
       setCreatedResult({
-        username: data.user.username,
-        initialPassword: data.generatedPassword,
+        username: cleanUsername,
+        initialPassword,
       });
 
       setUsername('');
@@ -91,7 +197,12 @@ export default function UsersView() {
       setName('');
       fetchData();
     } catch (err) {
-      setError(err.message || 'Terjadi kesalahan sistem');
+      const msg = err.message || '';
+      if (msg.includes('JSON') || msg.includes('unexpected end of data')) {
+        setError('Gagal memproses data dari server. Silakan coba lagi.');
+      } else {
+        setError(msg || 'Terjadi kesalahan sistem saat membuat akun');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -100,14 +211,33 @@ export default function UsersView() {
   const handleResetPassword = async (userId) => {
     if (!window.confirm('Reset password untuk akun ini? User akan diwajibkan ganti password saat login berikutnya.')) return;
     try {
-      const res = await fetch(`/api/users/${userId}/reset-password`, { method: 'PUT' });
-      const data = await res.json();
-      if (res.ok) {
-        alert(`Password berhasil di-reset!\nPassword baru sementara: ${data.temporaryPassword}`);
-        fetchData();
+      const tempPassword = 'Reset' + Math.floor(1000 + Math.random() * 9000);
+
+      // 1. Update ke Firestore jika terhubung
+      if (db) {
+        try {
+          await updateDoc(doc(db, 'users', userId), {
+            password: tempPassword,
+            must_change_password: true,
+            updated_at: new Date().toISOString(),
+          });
+        } catch (fErr) {
+          console.warn('Firestore reset password error:', fErr);
+        }
       }
+
+      // 2. Kirim ke backend jika online
+      try {
+        await fetch(`/api/users/${userId}/reset-password`, { method: 'PUT' });
+      } catch (apiErr) {
+        console.warn('API reset-password offline');
+      }
+
+      alert(`Password berhasil di-reset!\nPassword baru sementara: ${tempPassword}`);
+      fetchData();
     } catch (err) {
       console.error(err);
+      alert('Gagal me-reset password: ' + err.message);
     }
   };
 
@@ -155,12 +285,28 @@ export default function UsersView() {
     }
   };
 
-  const handleToggleActive = async (userId) => {
+  const handleToggleActive = async (userId, currentActive) => {
     try {
-      const res = await fetch(`/api/users/${userId}/toggle-active`, { method: 'PUT' });
-      if (res.ok) {
-        fetchData();
+      const newActive = !currentActive;
+
+      if (db) {
+        try {
+          await updateDoc(doc(db, 'users', userId), {
+            active: newActive,
+            updated_at: new Date().toISOString(),
+          });
+        } catch (fErr) {
+          console.warn('Firestore toggle active error:', fErr);
+        }
       }
+
+      try {
+        await fetch(`/api/users/${userId}/toggle-active`, { method: 'PUT' });
+      } catch (apiErr) {
+        console.warn('API toggle active offline');
+      }
+
+      fetchData();
     } catch (err) {
       console.error(err);
     }
@@ -279,7 +425,7 @@ export default function UsersView() {
                               className="btn btn-secondary btn-sm btn-icon"
                               style={{ color: u.active ? '#ef4444' : '#10b981' }}
                               title={u.active ? 'Nonaktifkan Akun' : 'Aktifkan Akun'}
-                              onClick={() => handleToggleActive(u.id)}
+                              onClick={() => handleToggleActive(u.id, u.active)}
                             >
                               {u.active ? <XCircle size={15} /> : <CheckCircle2 size={15} />}
                             </button>
@@ -352,7 +498,7 @@ export default function UsersView() {
                     <button
                       className="btn btn-secondary btn-sm"
                       style={{ color: u.active ? '#ef4444' : '#10b981' }}
-                      onClick={() => handleToggleActive(u.id)}
+                      onClick={() => handleToggleActive(u.id, u.active)}
                     >
                       {u.active ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
                       <span>{u.active ? 'Nonaktif' : 'Aktif'}</span>

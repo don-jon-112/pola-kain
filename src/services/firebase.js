@@ -16,6 +16,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { hashPassword } from '../utils/crypto';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -138,16 +139,17 @@ export const ensureDefaultAdminInFirestore = async () => {
     const usersColl = collection(db, 'users');
     const snap = await getDocs(usersColl);
     if (snap.empty) {
-      console.log('🌱 Firestore users collection is empty. Seeding default Admin & Owner accounts...');
+      console.log('🌱 Firestore users collection is empty. Seeding default Admin & Owner accounts with bcrypt hash...');
+      const defaultHash = await hashPassword('password123');
       await setDoc(doc(db, 'users', 'usr_superadmin'), {
         id: 'usr_superadmin',
         username: 'superadmin',
         email: 'superadmin@konveksi.id',
-        password: 'password123',
+        password: defaultHash,
         name: 'Super Admin Utama',
         role: 'SUPER_ADMIN',
         active: true,
-        must_change_password: false,
+        must_change_password: true,
         created_at: new Date().toISOString(),
       });
 
@@ -155,14 +157,14 @@ export const ensureDefaultAdminInFirestore = async () => {
         id: 'usr_owner',
         username: 'owner',
         email: 'owner@konveksi.id',
-        password: 'password123',
+        password: defaultHash,
         name: 'Pak Hendra (Owner)',
         role: 'OWNER',
         active: true,
-        must_change_password: false,
+        must_change_password: true,
         created_at: new Date().toISOString(),
       });
-      console.log('✅ Default accounts (superadmin / owner with password: password123) successfully seeded to Firestore!');
+      console.log('✅ Default accounts (superadmin / owner) successfully seeded to Firestore with bcrypt encrypted password!');
     }
   } catch (err) {
     console.warn('Note on Firestore users check/seed:', err.message);

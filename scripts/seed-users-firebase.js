@@ -36,16 +36,17 @@ console.log('Connecting to Firebase Project:', firebaseConfig.projectId);
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+import bcrypt from 'bcryptjs';
+
 const initialUsers = [
   {
     id: 'usr_superadmin',
     username: 'superadmin',
     email: 'superadmin@konveksi.id',
-    password: 'password123',
     name: 'Super Admin Utama',
     role: 'SUPER_ADMIN',
     customer_id: null,
-    must_change_password: false,
+    must_change_password: true,
     active: true,
     created_at: new Date().toISOString(),
   },
@@ -53,11 +54,10 @@ const initialUsers = [
     id: 'usr_owner',
     username: 'owner',
     email: 'owner@konveksi.id',
-    password: 'password123',
     name: 'Pak Hendra (Owner)',
     role: 'OWNER',
     customer_id: null,
-    must_change_password: false,
+    must_change_password: true,
     active: true,
     created_at: new Date().toISOString(),
   },
@@ -65,11 +65,10 @@ const initialUsers = [
     id: 'usr_cust_smp',
     username: 'cust_smp',
     email: 'admin@smpharapan.sch.id',
-    password: 'password123',
     name: 'SMP Harapan Bangsa (Ibu Lina)',
     role: 'CUSTOMER',
     customer_id: 'cust_01',
-    must_change_password: false,
+    must_change_password: true,
     active: true,
     created_at: new Date().toISOString(),
   },
@@ -77,11 +76,12 @@ const initialUsers = [
 
 async function seed() {
   try {
+    const defaultHash = await bcrypt.hash('password123', 10);
     for (const u of initialUsers) {
-      console.log(`Adding user: ${u.username} (${u.role})...`);
-      await setDoc(doc(db, 'users', u.id), u, { merge: true });
+      console.log(`Adding user: ${u.username} (${u.role}) with bcrypt hashed password...`);
+      await setDoc(doc(db, 'users', u.id), { ...u, password: defaultHash }, { merge: true });
     }
-    console.log('🎉 Successfully created users in Firestore!');
+    console.log('🎉 Successfully created users in Firestore with bcrypt encrypted password!');
 
     const snap = await getDocs(collection(db, 'users'));
     console.log(`Total users in Firestore now: ${snap.size}`);

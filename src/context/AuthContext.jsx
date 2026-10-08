@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db, ensureDefaultAdminInFirestore } from '../services/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
+import { verifyPassword, hashPassword, isHashed } from '../utils/crypto';
 
 const AuthContext = createContext(null);
 
@@ -125,9 +126,21 @@ export function AuthProvider({ children }) {
 
         if (!snap.empty) {
           const userDoc = snap.docs[0].data();
-          if (userDoc.password === cleanPass) {
+          const isPasswordValid = await verifyPassword(cleanPass, userDoc.password);
+
+          if (isPasswordValid) {
             if (userDoc.active === false) {
               throw new Error('Akun Anda sedang dinonaktifkan oleh administrator');
+            }
+
+            // Jika password di Firestore masih plain text, upgrade otomatis ke bcrypt hash
+            if (!isHashed(userDoc.password)) {
+              try {
+                const hashed = await hashPassword(cleanPass);
+                await updateDoc(doc(db, 'users', snap.docs[0].id), { password: hashed });
+              } catch (upErr) {
+                console.warn('Auto upgrade password hash in Firestore:', upErr);
+              }
             }
 
             const { password: _, ...safeUser } = userDoc;

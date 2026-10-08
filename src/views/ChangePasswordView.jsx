@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { KeyRound, ShieldAlert, CheckCircle, ArrowRight, X } from 'lucide-react';
 import { db } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { hashPassword } from '../utils/crypto';
 
 export default function ChangePasswordView({ onClose }) {
   const { user, setUser, setMustChangePassword } = useAuth();
@@ -44,12 +45,13 @@ export default function ChangePasswordView({ onClose }) {
         console.warn('API backend change-password offline, syncing directly to Firestore...');
       }
 
-      // 2. Sinkronkan langsung ke Firestore jika terhubung ke Firebase
+      // 2. Sinkronkan langsung ke Firestore jika terhubung ke Firebase (dienkripsi dengan bcrypt)
       if (db && user?.id) {
         try {
+          const hashedPassword = await hashPassword(newPassword);
           const userDocRef = doc(db, 'users', user.id);
           await updateDoc(userDocRef, {
-            password: newPassword,
+            password: hashedPassword,
             must_change_password: false,
             updated_at: new Date().toISOString(),
           });

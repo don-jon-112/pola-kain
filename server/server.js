@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import bcrypt from 'bcryptjs';
 import { db } from './db.js';
 
 // Auto-reloaded with variant pricing & human status support
@@ -15,18 +16,47 @@ const generateId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString
 // -----------------------------------------------------------------------------
 // AUTH & USERS
 // -----------------------------------------------------------------------------
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Username dan password wajib diisi' });
   }
 
+  const cleanIdentifier = username.trim().toLowerCase();
+  const cleanPassword = password.trim();
+
+  // Cari user berdasarkan username ATAU email
   const user = db.find(
     'users',
-    (u) => (u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === username.toLowerCase())
+    (u) =>
+      u.username.toLowerCase() === cleanIdentifier ||
+      (u.email && u.email.toLowerCase() === cleanIdentifier)
   );
 
-  if (!user || user.password !== password) {
+  if (!user) {
+    return res.status(401).json({ error: 'Username atau password salah' });
+  }
+
+  // Verifikasi password (bcrypt hash atau fallback plain text)
+  let isPasswordValid = false;
+  const isBcrypt = /^\$2[aby]\$\d{2}\$/.test(user.password);
+
+  if (isBcrypt) {
+    isPasswordValid = await bcrypt.compare(cleanPassword, user.password);
+  } else {
+    isPasswordValid = user.password === cleanPassword;
+    // Auto upgrade password plain ke bcrypt hash
+    if (isPasswordValid) {
+      try {
+        const hashed = await bcrypt.hash(cleanPassword, 10);
+        db.update('users', user.id, { password: hashed });
+      } catch (err) {
+        console.warn('Auto-hash password upgrade error:', err);
+      }
+    }
+  }
+
+  if (!isPasswordValid) {
     return res.status(401).json({ error: 'Username atau password salah' });
   }
 
@@ -44,11 +74,11 @@ app.post('/api/auth/login', (req, res) => {
   res.json({
     user: safeUser,
     customer: customerInfo,
-    must_change_password: user.must_change_password,
+    must_change_password: Boolean(user.must_change_password),
   });
 });
 
-app.post('/api/auth/change-password', (req, res) => {
+app.post('/api/auth/change-password', async (req, res) => {
   const { userId, oldPassword, newPassword } = req.body;
   if (!userId || !newPassword) {
     return res.status(400).json({ error: 'Data tidak lengkap' });
@@ -63,13 +93,23 @@ app.post('/api/auth/change-password', (req, res) => {
     return res.status(404).json({ error: 'User tidak ditemukan' });
   }
 
-  // If not first login, verify old password
-  if (!user.must_change_password && oldPassword && user.password !== oldPassword) {
-    return res.status(400).json({ error: 'Password lama salah' });
+  // Jika bukan login pertama kali, verifikasi password lama
+  if (!user.must_change_password && oldPassword) {
+    const isBcrypt = /^\$2[aby]\$\d{2}\$/.test(user.password);
+    const isOldValid = isBcrypt
+      ? await bcrypt.compare(oldPassword.trim(), user.password)
+      : user.password === oldPassword.trim();
+
+    if (!isOldValid) {
+      return res.status(400).json({ error: 'Password lama salah' });
+    }
   }
 
+  // Enkripsi password baru dengan bcrypt
+  const hashedPassword = await bcrypt.hash(newPassword.trim(), 10);
+
   const updated = db.update('users', userId, {
-    password: newPassword,
+    password: hashedPassword,
     must_change_password: false,
     updated_at: new Date().toISOString(),
   });
@@ -83,26 +123,35 @@ app.get('/api/users', (req, res) => {
   res.json(users);
 });
 
-app.post('/api/users', (req, res) => {
+app.post('/api/users', async (req, res) => {
   const { username, email, name, role, customer_id } = req.body;
   if (!username || !email || !name || !role) {
     return res.status(400).json({ error: 'Data user wajib diisi lengkap' });
   }
 
-  const existing = db.find('users', (u) => u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === email.toLowerCase());
+  const cleanUsername = username.trim().toLowerCase();
+  const cleanEmail = email.trim().toLowerCase();
+
+  const existing = db.find(
+    'users',
+    (u) =>
+      u.username.toLowerCase() === cleanUsername ||
+      u.email.toLowerCase() === cleanEmail
+  );
   if (existing) {
     return res.status(400).json({ error: 'Username atau Email sudah terdaftar' });
   }
 
-  // Generate initial password
+  // Generate initial password dan enkripsi dengan bcrypt
   const initialPassword = 'User' + Math.floor(1000 + Math.random() * 9000);
+  const hashedPassword = await bcrypt.hash(initialPassword, 10);
 
   const newUser = {
     id: generateId('usr'),
-    username,
-    email,
-    password: initialPassword,
-    name,
+    username: cleanUsername,
+    email: cleanEmail,
+    password: hashedPassword,
+    name: name.trim(),
     role,
     customer_id: role === 'CUSTOMER' ? customer_id : null,
     must_change_password: true,
@@ -119,14 +168,16 @@ app.post('/api/users', (req, res) => {
   });
 });
 
-app.put('/api/users/:id/reset-password', (req, res) => {
+app.put('/api/users/:id/reset-password', async (req, res) => {
   const { id } = req.params;
   const user = db.find('users', (u) => u.id === id);
   if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
 
   const tempPassword = 'Reset' + Math.floor(1000 + Math.random() * 9000);
+  const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
   db.update('users', id, {
-    password: tempPassword,
+    password: hashedPassword,
     must_change_password: true,
   });
 
@@ -136,7 +187,7 @@ app.put('/api/users/:id/reset-password', (req, res) => {
   });
 });
 
-app.put('/api/users/:id/set-password', (req, res) => {
+app.put('/api/users/:id/set-password', async (req, res) => {
   const { id } = req.params;
   const { newPassword } = req.body;
   if (!newPassword || newPassword.length < 6) {
@@ -146,8 +197,10 @@ app.put('/api/users/:id/set-password', (req, res) => {
   const user = db.find('users', (u) => u.id === id);
   if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
 
+  const hashedPassword = await bcrypt.hash(newPassword.trim(), 10);
+
   db.update('users', id, {
-    password: newPassword,
+    password: hashedPassword,
     must_change_password: false,
     updated_at: new Date().toISOString(),
   });

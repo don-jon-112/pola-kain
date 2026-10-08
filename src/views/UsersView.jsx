@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
 import { doc, updateDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { hashPassword } from '../utils/crypto';
 
 const safeParseJson = (text, fallback = null) => {
   if (!text || typeof text !== 'string') return fallback;
@@ -132,6 +133,7 @@ export default function UsersView() {
 
       // Generate initial password & unique ID
       const initialPassword = 'User' + Math.floor(1000 + Math.random() * 9000);
+      const hashedPassword = await hashPassword(initialPassword);
       const newUserId = 'usr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
 
       const newUserPayload = {
@@ -139,7 +141,7 @@ export default function UsersView() {
         username: cleanUsername,
         email: cleanEmail,
         name: cleanName,
-        password: initialPassword,
+        password: hashedPassword,
         role,
         customer_id: role === 'CUSTOMER' ? customerId : null,
         must_change_password: true,
@@ -147,7 +149,7 @@ export default function UsersView() {
         created_at: new Date().toISOString(),
       };
 
-      // 1. Simpan langsung ke Firebase Firestore jika terhubung
+      // 1. Simpan langsung ke Firebase Firestore jika terhubung (password terenkripsi)
       if (db) {
         try {
           await setDoc(doc(db, 'users', newUserId), newUserPayload);
@@ -212,12 +214,13 @@ export default function UsersView() {
     if (!window.confirm('Reset password untuk akun ini? User akan diwajibkan ganti password saat login berikutnya.')) return;
     try {
       const tempPassword = 'Reset' + Math.floor(1000 + Math.random() * 9000);
+      const hashedTempPassword = await hashPassword(tempPassword);
 
       // 1. Update ke Firestore jika terhubung
       if (db) {
         try {
           await updateDoc(doc(db, 'users', userId), {
-            password: tempPassword,
+            password: hashedTempPassword,
             must_change_password: true,
             updated_at: new Date().toISOString(),
           });
@@ -263,9 +266,10 @@ export default function UsersView() {
 
       if (db && selectedUserForPassword?.id) {
         try {
+          const hashedCustomPassword = await hashPassword(customPasswordInput);
           const userDocRef = doc(db, 'users', selectedUserForPassword.id);
           await updateDoc(userDocRef, {
-            password: customPasswordInput,
+            password: hashedCustomPassword,
             must_change_password: false,
             updated_at: new Date().toISOString(),
           });

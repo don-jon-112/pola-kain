@@ -6,17 +6,29 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('konveksi_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('konveksi_user');
+      return saved && saved !== 'undefined' ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
 
   const [customer, setCustomer] = useState(() => {
-    const saved = localStorage.getItem('konveksi_customer');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('konveksi_customer');
+      return saved && saved !== 'undefined' ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
 
   const [mustChangePassword, setMustChangePassword] = useState(() => {
-    return localStorage.getItem('konveksi_must_change_pw') === 'true';
+    try {
+      return localStorage.getItem('konveksi_must_change_pw') === 'true';
+    } catch {
+      return false;
+    }
   });
 
   useEffect(() => {
@@ -50,6 +62,10 @@ export function AuthProvider({ children }) {
     const cleanUser = (username || '').trim().toLowerCase();
     const cleanPass = (password || '').trim();
 
+    if (!cleanUser || !cleanPass) {
+      throw new Error('Username dan password wajib diisi');
+    }
+
     // 1. Coba login lewat backend API Express terlebih dahulu
     try {
       const res = await fetch('/api/auth/login', {
@@ -58,25 +74,37 @@ export function AuthProvider({ children }) {
         body: JSON.stringify({ username: cleanUser, password: cleanPass }),
       });
 
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {};
+      }
+
       if (res.ok) {
-        const data = await res.json();
         setUser(data.user);
         setCustomer(data.customer || null);
         setMustChangePassword(Boolean(data.must_change_password));
         return data;
       } else {
-        const data = await res.json();
-        // Jika server menolak dengan pesan kredensial salah, teruskan pesan
-        if (res.status === 401 || res.status === 403) {
-          throw new Error(data.error || 'Username atau password salah');
+        if (res.status === 401) {
+          throw new Error('Username atau password salah. Silakan periksa kembali.');
+        }
+        if (res.status === 403) {
+          throw new Error(data.error || 'Akun Anda sedang dinonaktifkan oleh administrator');
         }
       }
     } catch (apiErr) {
-      // Jika error 401/403 dari server lokal, lemparkan
-      if (apiErr.message === 'Username atau password salah' || apiErr.message.includes('dinonaktifkan')) {
+      // Jika pesan adalah kesalahan kredensial atau akun dinonaktifkan, teruskan ke UI
+      if (
+        apiErr.message.includes('Username atau password salah') ||
+        apiErr.message.includes('dinonaktifkan') ||
+        apiErr.message.includes('wajib diisi')
+      ) {
         throw apiErr;
       }
-      console.warn('Backend server tidak dapat dijangkau, mencoba autentikasi langsung ke Firebase Firestore...');
+      console.warn('Backend server lokal tidak merespons, mencoba autentikasi langsung ke Firebase Firestore...');
     }
 
     // 2. Fallback autentikasi langsung ke Cloud Firestore (untuk deploy Vercel / Cloud)
@@ -98,7 +126,7 @@ export function AuthProvider({ children }) {
         if (!snap.empty) {
           const userDoc = snap.docs[0].data();
           if (userDoc.password === cleanPass) {
-            if (!userDoc.active) {
+            if (userDoc.active === false) {
               throw new Error('Akun Anda sedang dinonaktifkan oleh administrator');
             }
 
@@ -107,15 +135,25 @@ export function AuthProvider({ children }) {
             setCustomer(null);
             setMustChangePassword(Boolean(userDoc.must_change_password));
             return { user: safeUser };
+          } else {
+            throw new Error('Password salah. Silakan periksa kembali password Anda.');
           }
         }
       } catch (firestoreErr) {
+        if (
+          firestoreErr.message.includes('Password salah') ||
+          firestoreErr.message.includes('dinonaktifkan')
+        ) {
+          throw firestoreErr;
+        }
+        if (firestoreErr.code === 'permission-denied') {
+          throw new Error('Akses Firebase Firestore ditolak. Pastikan Firestore Security Rules sudah di-publish.');
+        }
         console.error('Firestore auth error:', firestoreErr);
-        if (firestoreErr.message.includes('dinonaktifkan')) throw firestoreErr;
       }
     }
 
-    throw new Error('Username atau password salah');
+    throw new Error('Username atau password salah. Silakan periksa kembali.');
   };
 
   const logout = () => {

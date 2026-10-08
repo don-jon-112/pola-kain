@@ -32,7 +32,13 @@ export default function LoginView() {
     try {
       await login(username, password);
     } catch (err) {
-      setError(err.message || 'Gagal login ke sistem');
+      let msg = err.message || 'Gagal login ke sistem';
+      if (msg.includes('JSON.parse') || msg.includes('unexpected end of data')) {
+        msg = 'Gagal menghubungi server. Silakan coba kembali atau periksa koneksi Anda.';
+      } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        msg = 'Koneksi internet bermasalah. Pastikan perangkat Anda terhubung ke internet.';
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }

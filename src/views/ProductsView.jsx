@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, CheckCircle2, XCircle, Package, AlertCircle, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../services/firebase';
+import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
+
+const safeParseJson = (text, fallback) => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+};
 
 export default function ProductsView() {
   const { user } = useAuth();
@@ -45,11 +55,44 @@ export default function ProductsView() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/products');
-      const data = await res.json();
-      setProducts(data);
+      let list = [];
+
+      // 1. Ambil dari Firestore Cloud terlebih dahulu jika terhubung
+      if (db) {
+        try {
+          const snap = await getDocs(collection(db, 'products'));
+          if (!snap.empty) {
+            list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          }
+        } catch (fErr) {
+          console.warn('Firestore fetch products notice:', fErr.message);
+        }
+      }
+
+      // 2. Ambil dari backend lokal jika Firestore belum ada data atau untuk fallback
+      if (list.length === 0) {
+        try {
+          const res = await fetch('/api/products');
+          const text = await res.text();
+          const data = safeParseJson(text, null);
+          if (Array.isArray(data)) {
+            list = data;
+          }
+        } catch (apiErr) {
+          console.warn('API fetch products fallback notice:', apiErr.message);
+        }
+      }
+
+      // Urutkan produk agar produk terbaru berada di atas
+      list.sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateB - dateA;
+      });
+
+      setProducts(list);
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching products:', err);
     } finally {
       setLoading(false);
     }
@@ -112,7 +155,7 @@ export default function ProductsView() {
     e.preventDefault();
     setError('');
 
-    if (!name) {
+    if (!name || !name.trim()) {
       setError('Nama produk wajib diisi');
       return;
     }
@@ -123,10 +166,13 @@ export default function ProductsView() {
       const parsedSizes = hasSize
         ? sizesList
             .filter((s) => s.size_code && s.size_code.trim())
-            .map((s) => ({
+            .map((s, idx) => ({
+              id: s.id || `psz_${Date.now()}_${idx}`,
               size_code: s.size_code.trim(),
               size_name: s.size_name?.trim() || `Size ${s.size_code.trim()}`,
               price: Number(s.price || 0),
+              sort_order: idx + 1,
+              active: true,
             }))
         : [];
 
@@ -144,35 +190,72 @@ export default function ProductsView() {
       }
 
       const effectivePrice = hasSize && parsedSizes.length > 0 ? parsedSizes[0].price : Number(singlePrice);
+      const targetId = editingProduct ? editingProduct.id : `prod_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const generatedCode = code.trim() || `PRD-${Date.now().toString().slice(-4)}`;
 
-      const payload = {
-        name,
-        code,
+      const productPayload = {
+        id: targetId,
+        code: generatedCode,
+        name: name.trim(),
         category,
-        description,
+        description: description.trim(),
         price: effectivePrice,
+        wage_per_piece: editingProduct?.wage_per_piece !== undefined ? Number(editingProduct.wage_per_piece) : 10000,
         has_size: hasSize,
         sizes: parsedSizes,
+        active: editingProduct?.active !== undefined ? editingProduct.active : true,
+        created_at: editingProduct?.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
 
-      const url = editingProduct ? `/api/products/${editingProduct.id}` : '/api/products';
-      const method = editingProduct ? 'PUT' : 'POST';
+      // 1. Simpan langsung ke Firebase Firestore jika terhubung
+      let savedToFirestore = false;
+      if (db) {
+        try {
+          await setDoc(doc(db, 'products', targetId), productPayload, { merge: true });
+          savedToFirestore = true;
+          console.log('✅ Produk berhasil disimpan ke Cloud Firestore:', targetId);
+        } catch (fErr) {
+          console.error('Firestore save product error:', fErr);
+          if (fErr.code === 'permission-denied') {
+            throw new Error('Akses Cloud Firestore ditolak. Pastikan Firestore Security Rules sudah di-publish.');
+          }
+        }
+      }
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      // 2. Sinkronkan ke API backend lokal jika tersedia
+      try {
+        const url = editingProduct ? `/api/products/${editingProduct.id}` : '/api/products';
+        const method = editingProduct ? 'PUT' : 'POST';
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Gagal menyimpan produk');
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(productPayload),
+        });
+
+        const text = await res.text();
+        const data = safeParseJson(text, null);
+
+        if (!res.ok) {
+          // Jika tidak berhasil disimpan ke Firestore dan API gagal, lempar error
+          if (!savedToFirestore) {
+            throw new Error((data && data.error) || `Gagal menyimpan ke server (status ${res.status})`);
+          }
+        }
+      } catch (apiErr) {
+        // Jika sudah tersimpan di Firestore (misalnya saat dideploy ke Vercel tanpa backend Express),
+        // abaikan error koneksi backend lokal.
+        if (!savedToFirestore) {
+          throw apiErr;
+        }
+        console.warn('API backend lokal tidak tersedia, data disimpan di Cloud Firestore.');
       }
 
       setShowModal(false);
-      fetchProducts();
+      await fetchProducts();
     } catch (err) {
-      setError(err.message || 'Terjadi kesalahan sistem');
+      setError(err.message || 'Terjadi kesalahan sistem saat menyimpan produk');
     } finally {
       setSubmitting(false);
     }
@@ -182,14 +265,32 @@ export default function ProductsView() {
     if (!window.confirm(`Yakin ingin ${currentActive ? 'menonaktifkan' : 'mengaktifkan'} produk ini?`)) return;
 
     try {
-      const res = await fetch(`/api/products/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: !currentActive }),
-      });
-      if (res.ok) {
-        fetchProducts();
+      const newActive = !currentActive;
+
+      // 1. Update ke Firebase Firestore
+      if (db) {
+        try {
+          await updateDoc(doc(db, 'products', id), {
+            active: newActive,
+            updated_at: new Date().toISOString(),
+          });
+        } catch (fErr) {
+          console.warn('Firestore update status notice:', fErr.message);
+        }
       }
+
+      // 2. Update ke API backend lokal
+      try {
+        await fetch(`/api/products/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active: newActive }),
+        });
+      } catch (apiErr) {
+        // silent
+      }
+
+      await fetchProducts();
     } catch (err) {
       console.error(err);
     }

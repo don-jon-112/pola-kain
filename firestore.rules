@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ==============================================================================
+    // POLAKAIN GARMENT SYSTEM - CLOUD FIRESTORE SECURITY RULES
+    // ==============================================================================
+    // Panduan pemasangan di Firebase Console:
+    // 1. Buka https://console.firebase.google.com/
+    // 2. Pilih Project Anda -> Klik menu "Firestore Database" di sidebar kiri
+    // 3. Klik tab "Rules" di bagian atas
+    // 4. Salin aturan di bawah ini dan klik tombol "Publish"
+    // ==============================================================================
+
+    // Mode Operasional Terbuka untuk Web App PolaKain
+    match /{document=**} {
+      allow read, write: if true;
+    }
+
+    // CATATAN KEAMANAN PRODUKSI:
+    // Jika Anda telah mengaktifkan Firebase Auth, Anda dapat mengganti aturan di atas menjadi:
+    // match /{document=**} {
+    //   allow read, write: if request.auth != null;
+    // }
+  }
+}

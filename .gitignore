@@ -1,0 +1,59 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data & temp files
+pids
+*.pid
+*.seed
+*.pid.lock
+*.tmp
+data/*.tmp
+
+# Dependency directories
+node_modules/
+
+# Production build outputs
+dist/
+dist-ssr/
+build/
+*.local
+
+# Environment variables & secrets (keep .env.example)
+.env
+.env.*
+!.env.example
+*.pem
+
+# Vercel & Firebase Deployments
+.vercel
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

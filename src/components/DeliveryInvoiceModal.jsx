@@ -1,7 +1,10 @@
 import React from 'react';
 import { Printer, X, Truck, CheckCircle2, PackageCheck, AlertCircle } from 'lucide-react';
+import { useOwnerName } from '../utils/useOwnerName';
 
 export default function DeliveryInvoiceModal({ delivery, onClose }) {
+  const ownerName = useOwnerName();
+
   if (!delivery) return null;
 
   const formatDate = (isoString) => {
@@ -245,7 +248,7 @@ export default function DeliveryInvoiceModal({ delivery, onClose }) {
               <div>
                 <div>Bagian Produksi / QC Gudang,</div>
                 <div style={{ height: '50px' }}></div>
-                <div style={{ fontWeight: 700, color: '#0f172a' }}>(Pak Hendra)</div>
+                <div style={{ fontWeight: 700, color: '#0f172a' }}>({ownerName})</div>
                 <div style={{ fontSize: '0.7rem' }}>Manajemen Konveksi</div>
               </div>
 

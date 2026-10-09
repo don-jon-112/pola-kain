@@ -13,9 +13,11 @@ import {
   Package,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useOwnerName } from '../utils/useOwnerName';
 
 export default function PayrollView() {
   const { user } = useAuth();
+  const ownerName = useOwnerName();
   const [employees, setEmployees] = useState([]);
   const [payrolls, setPayrolls] = useState([]);
   const [products, setProducts] = useState([]);
@@ -1103,7 +1105,8 @@ export default function PayrollView() {
                   <div>
                     <div>Manajemen Konveksi,</div>
                     <div style={{ height: '45px' }}></div>
-                    <div style={{ fontWeight: 700 }}>Pak Hendra</div>
+                    <div style={{ fontWeight: 700 }}>({ownerName})</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Owner / Pimpinan</div>
                   </div>
                 </div>
               </div>

@@ -160,13 +160,20 @@ export const ensureDefaultAdminInFirestore = async () => {
         username: 'owner',
         email: 'owner@konveksi.id',
         password: defaultHash,
-        name: 'Pak Hendra (Owner)',
+        name: 'Owner Konveksi',
         role: 'OWNER',
         active: true,
         must_change_password: true,
         created_at: new Date().toISOString(),
       });
       console.log('✅ Default accounts (superadmin / owner) successfully seeded to Firestore with bcrypt encrypted password!');
+    } else {
+      // Periksa apakah akun owner masih menggunakan nama dummy lama 'Pak Hendra'
+      const ownerDocRef = doc(db, 'users', 'usr_owner');
+      const ownerSnap = await getDoc(ownerDocRef);
+      if (ownerSnap.exists() && (ownerSnap.data().name || '').toLowerCase().includes('hendra')) {
+        await updateDoc(ownerDocRef, { name: 'Owner Konveksi' });
+      }
     }
   } catch (err) {
     console.warn('Note on Firestore users check/seed:', err.message);

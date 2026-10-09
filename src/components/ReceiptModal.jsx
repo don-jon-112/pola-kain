@@ -1,7 +1,10 @@
 import React from 'react';
 import { Printer, X, CheckCircle, Clock } from 'lucide-react';
+import { useOwnerName } from '../utils/useOwnerName';
 
 export default function ReceiptModal({ order, onClose }) {
+  const ownerName = useOwnerName();
+
   if (!order) return null;
 
   const handlePrint = () => {
@@ -229,8 +232,8 @@ export default function ReceiptModal({ order, onClose }) {
               <div>
                 <div>Dikonfirmasi Oleh,</div>
                 <div style={{ height: '55px' }}></div>
-                <div style={{ fontWeight: 700, color: '#0f172a' }}>Pak Hendra</div>
-                <div style={{ fontSize: '0.75rem' }}>Management PolaKain</div>
+                <div style={{ fontWeight: 700, color: '#0f172a' }}>({ownerName})</div>
+                <div style={{ fontSize: '0.75rem' }}>Owner / Manajemen PolaKain</div>
               </div>
             </div>
 

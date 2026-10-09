@@ -54,7 +54,7 @@ const initialUsers = [
     id: 'usr_owner',
     username: 'owner',
     email: 'owner@konveksi.id',
-    name: 'Pak Hendra (Owner)',
+    name: 'Owner Konveksi',
     role: 'OWNER',
     customer_id: null,
     must_change_password: true,

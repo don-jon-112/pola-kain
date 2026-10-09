@@ -18,7 +18,7 @@
       "username": "owner",
       "email": "owner@konveksi.id",
       "password": "$2b$10$oEAnuie0lM9HG7/ps0XFXewgTQbRJkzSbTNtCqS.1ZA0aqBWvtgiW",
-      "name": "Pak Hendra (Owner)",
+      "name": "Owner Konveksi",
       "role": "OWNER",
       "customer_id": null,
       "must_change_password": true,
@@ -725,7 +725,7 @@
       "order_id": "ord_1",
       "status": "CONFIRMED",
       "notes": "Order dikonfirmasi oleh Owner. Pembayaran DP diterima.",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-01T14:00:00Z"
     },
     {
@@ -733,7 +733,7 @@
       "order_id": "ord_1",
       "status": "PRODUCTION",
       "notes": "Pola dipotong dan proses jahit dimulai.",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-02T08:30:00Z"
     },
     {
@@ -741,7 +741,7 @@
       "order_id": "ord_1",
       "status": "READY",
       "notes": "QC selesai, barang disortir dan dipacking rapi.",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-05T16:00:00Z"
     },
     {
@@ -749,7 +749,7 @@
       "order_id": "ord_1",
       "status": "DELIVERING",
       "notes": "Dikirim dengan kurir operasional konveksi (Surat Jalan SJ-2026-001).",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-06T09:00:00Z"
     },
     {
@@ -757,7 +757,7 @@
       "order_id": "ord_1",
       "status": "COMPLETED",
       "notes": "Diterima oleh Ibu Lina di SMP Harapan Bangsa. Transaksi lunas.",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-06T15:00:00Z"
     },
     {
@@ -773,7 +773,7 @@
       "order_id": "ord_2",
       "status": "CONFIRMED",
       "notes": "Dikonfirmasi, jadwal potong bahan disiapkan.",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-05T13:30:00Z"
     },
     {
@@ -781,7 +781,7 @@
       "order_id": "ord_2",
       "status": "PARTIALLY_DELIVERED",
       "notes": "Pengiriman Bertahap Tahap 1 (Faktur/Surat Jalan SJ-2026-002): 20 pcs Celana Size 28 & 20 pcs Celana Size 29 telah dikirimkan ke sekolah.",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-07T10:00:00Z"
     },
     {
@@ -797,7 +797,7 @@
       "order_id": "ord_2",
       "status": "PARTIALLY_DELIVERED",
       "notes": "Pengiriman Bertahap (SJ-2026-003): 1 pcs dikirim. Masih terdapat sisa pesanan.",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T12:22:24.842Z"
     },
     {
@@ -805,7 +805,7 @@
       "order_id": "ord_2",
       "status": "PARTIALLY_DELIVERED",
       "notes": "Pengiriman Bertahap (SJ-2026-004): 122 pcs dikirim. Masih terdapat sisa pesanan.",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T12:22:37.793Z"
     },
     {
@@ -813,7 +813,7 @@
       "order_id": "ord_2",
       "status": "PARTIALLY_DELIVERED",
       "notes": "Pengiriman Bertahap (SJ-2026-005): 1 pcs dikirim. Masih terdapat sisa pesanan.",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T12:24:21.643Z"
     },
     {
@@ -821,7 +821,7 @@
       "order_id": "ord_3",
       "status": "CONFIRMED",
       "notes": "Pesanan disetujui owner",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T13:49:01.122Z"
     },
     {
@@ -829,7 +829,7 @@
       "order_id": "ord_3",
       "status": "PRODUCTION",
       "notes": "Mulai potong pola & jahit",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T13:49:05.135Z"
     },
     {
@@ -837,7 +837,7 @@
       "order_id": "ord_3",
       "status": "READY",
       "notes": "QC selesai, dipacking rapi",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T13:49:06.149Z"
     },
     {
@@ -845,7 +845,7 @@
       "order_id": "ord_3",
       "status": "DELIVERING",
       "notes": "Diserahkan ke kurir",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T13:49:07.088Z"
     },
     {
@@ -853,7 +853,7 @@
       "order_id": "ord_3",
       "status": "COMPLETED",
       "notes": "Diterima customer & lunas",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T13:49:07.877Z"
     },
     {
@@ -861,7 +861,7 @@
       "order_id": "ord_3",
       "status": "COMPLETED",
       "notes": "Pengiriman Terakhir (SJ-2026-007): 50 pcs dikirim. Seluruh pesanan telah lengkap terkirim!",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T13:49:54.693Z"
     },
     {
@@ -877,7 +877,7 @@
       "order_id": "ord_1791467408725_0y5ic",
       "status": "CONFIRMED",
       "notes": "Pesanan disetujui owner",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T13:50:14.131Z"
     },
     {
@@ -893,7 +893,7 @@
       "order_id": "ord_1791467553199_8qpyh",
       "status": "CONFIRMED",
       "notes": "Pesanan disetujui owner",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T13:53:13.501Z"
     },
     {
@@ -901,7 +901,7 @@
       "order_id": "ord_1791467553199_8qpyh",
       "status": "PARTIALLY_DELIVERED",
       "notes": "Pengiriman Bertahap (SJ-2026-008): 1 pcs dikirim. Masih terdapat sisa pesanan.",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T13:53:18.839Z"
     },
     {
@@ -917,7 +917,7 @@
       "order_id": "ord_2",
       "status": "PARTIALLY_DELIVERED",
       "notes": "Pengiriman Bertahap (SJ-2026-009): 5 pcs dikirim. Masih terdapat sisa pesanan.",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T14:25:37.295Z"
     },
     {
@@ -933,7 +933,7 @@
       "order_id": "ord_1791468135710_jm0ks",
       "status": "PARTIALLY_DELIVERED",
       "notes": "Pengiriman Bertahap (SJ-2026-010): 1 pcs dikirim. Masih terdapat sisa pesanan.",
-      "updated_by_name": "Pak Hendra (Owner)",
+      "updated_by_name": "Owner Konveksi",
       "created_at": "2026-10-08T14:32:07.791Z"
     }
   ],
@@ -1195,7 +1195,7 @@
       "recipient_name": "SD Pertiwi 01",
       "phone": "081398765432",
       "address": "asd",
-      "pic_name": "Pak Hendra (Owner)",
+      "pic_name": "Owner Konveksi",
       "status": "DELIVERING",
       "notes": "",
       "total_shipped_pcs": 50,
@@ -1255,7 +1255,7 @@
       "recipient_name": "SMP Harapan Bangsa",
       "phone": "081234567890",
       "address": "a",
-      "pic_name": "Pak Hendra (Owner)",
+      "pic_name": "Owner Konveksi",
       "status": "DELIVERING",
       "notes": "",
       "total_shipped_pcs": 1,
@@ -1289,7 +1289,7 @@
       "recipient_name": "SMP Harapan Bangsa",
       "phone": "081234567890",
       "address": "Jl. Merdeka No. 123, Jakarta",
-      "pic_name": "Pak Hendra (Owner)",
+      "pic_name": "Owner Konveksi",
       "status": "DELIVERING",
       "notes": "",
       "total_shipped_pcs": 5,
@@ -1323,7 +1323,7 @@
       "recipient_name": "SMP Harapan Bangsa",
       "phone": "081234567890",
       "address": "asdaq",
-      "pic_name": "Pak Hendra (Owner)",
+      "pic_name": "Owner Konveksi",
       "status": "DELIVERING",
       "notes": "",
       "total_shipped_pcs": 1,
@@ -1438,7 +1438,7 @@
       "new_quantity": 150,
       "notes": "Pembelian gulungan kain dari Toko Tekstil Jaya",
       "reference_order_id": null,
-      "created_by": "Pak Hendra (Owner)",
+      "created_by": "Owner Konveksi",
       "created_at": "2026-10-01T11:00:00Z"
     },
     {
@@ -1451,7 +1451,7 @@
       "new_quantity": 120,
       "notes": "Pemakaian potong seragam batik",
       "reference_order_id": "ord_1",
-      "created_by": "Pak Hendra (Owner)",
+      "created_by": "Owner Konveksi",
       "created_at": "2026-10-03T09:00:00Z"
     },
     {
@@ -1464,7 +1464,7 @@
       "new_quantity": 18,
       "notes": "Pemakaian produksi kemeja putih SMP",
       "reference_order_id": "ord_1",
-      "created_by": "Pak Hendra (Owner)",
+      "created_by": "Owner Konveksi",
       "created_at": "2026-10-03T14:00:00Z"
     }
   ],

@@ -28,7 +28,7 @@ function getInitialData() {
         username: 'owner',
         email: 'owner@konveksi.id',
         password: 'password123',
-        name: 'Pak Hendra (Owner)',
+        name: 'Owner Konveksi',
         role: 'OWNER',
         customer_id: null,
         must_change_password: false,
@@ -380,7 +380,7 @@ function getInitialData() {
         order_id: 'ord_1',
         status: 'CONFIRMED',
         notes: 'Order dikonfirmasi oleh Owner. Pembayaran DP diterima.',
-        updated_by_name: 'Pak Hendra (Owner)',
+        updated_by_name: 'Owner Konveksi',
         created_at: '2026-10-01T14:00:00Z',
       },
       {
@@ -388,7 +388,7 @@ function getInitialData() {
         order_id: 'ord_1',
         status: 'PRODUCTION',
         notes: 'Pola dipotong dan proses jahit dimulai.',
-        updated_by_name: 'Pak Hendra (Owner)',
+        updated_by_name: 'Owner Konveksi',
         created_at: '2026-10-02T08:30:00Z',
       },
       {
@@ -396,7 +396,7 @@ function getInitialData() {
         order_id: 'ord_1',
         status: 'READY',
         notes: 'QC selesai, barang disortir dan dipacking rapi.',
-        updated_by_name: 'Pak Hendra (Owner)',
+        updated_by_name: 'Owner Konveksi',
         created_at: '2026-10-05T16:00:00Z',
       },
       {
@@ -404,7 +404,7 @@ function getInitialData() {
         order_id: 'ord_1',
         status: 'DELIVERING',
         notes: 'Dikirim dengan kurir operasional konveksi (Surat Jalan SJ-2026-001).',
-        updated_by_name: 'Pak Hendra (Owner)',
+        updated_by_name: 'Owner Konveksi',
         created_at: '2026-10-06T09:00:00Z',
       },
       {
@@ -412,7 +412,7 @@ function getInitialData() {
         order_id: 'ord_1',
         status: 'COMPLETED',
         notes: 'Diterima oleh Ibu Lina di SMP Harapan Bangsa. Transaksi lunas.',
-        updated_by_name: 'Pak Hendra (Owner)',
+        updated_by_name: 'Owner Konveksi',
         created_at: '2026-10-06T15:00:00Z',
       },
 
@@ -430,7 +430,7 @@ function getInitialData() {
         order_id: 'ord_2',
         status: 'CONFIRMED',
         notes: 'Dikonfirmasi, jadwal potong bahan disiapkan.',
-        updated_by_name: 'Pak Hendra (Owner)',
+        updated_by_name: 'Owner Konveksi',
         created_at: '2026-10-05T13:30:00Z',
       },
       {
@@ -438,7 +438,7 @@ function getInitialData() {
         order_id: 'ord_2',
         status: 'PARTIALLY_DELIVERED',
         notes: 'Pengiriman Bertahap Tahap 1 (Faktur/Surat Jalan SJ-2026-002): 20 pcs Celana Size 28 & 20 pcs Celana Size 29 telah dikirimkan ke sekolah.',
-        updated_by_name: 'Pak Hendra (Owner)',
+        updated_by_name: 'Owner Konveksi',
         created_at: '2026-10-07T10:00:00Z',
       },
 
@@ -647,7 +647,7 @@ function getInitialData() {
         new_quantity: 150,
         notes: 'Pembelian gulungan kain dari Toko Tekstil Jaya',
         reference_order_id: null,
-        created_by: 'Pak Hendra (Owner)',
+        created_by: 'Owner Konveksi',
         created_at: '2026-10-01T11:00:00Z',
       },
       {
@@ -660,7 +660,7 @@ function getInitialData() {
         new_quantity: 120,
         notes: 'Pemakaian potong seragam batik',
         reference_order_id: 'ord_1',
-        created_by: 'Pak Hendra (Owner)',
+        created_by: 'Owner Konveksi',
         created_at: '2026-10-03T09:00:00Z',
       },
       {
@@ -673,7 +673,7 @@ function getInitialData() {
         new_quantity: 18,
         notes: 'Pemakaian produksi kemeja putih SMP',
         reference_order_id: 'ord_1',
-        created_by: 'Pak Hendra (Owner)',
+        created_by: 'Owner Konveksi',
         created_at: '2026-10-03T14:00:00Z',
       },
     ],

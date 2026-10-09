@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, CheckCircle2, XCircle, Package, AlertCircle, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, CheckCircle2, XCircle, Package, AlertCircle, X, Power } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
-import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 const safeParseJson = (text, fallback) => {
   try {
@@ -296,6 +296,37 @@ export default function ProductsView() {
     }
   };
 
+  const handleDeleteProduct = async (id, productName) => {
+    if (!window.confirm(`HAPUS PERMANEN produk "${productName}"?\n\nPerhatian: Produk ini akan dihapus secara permanen dari katalog dan database.`)) {
+      return;
+    }
+
+    try {
+      // 1. Hapus langsung dari Cloud Firestore jika terhubung
+      if (db) {
+        try {
+          await deleteDoc(doc(db, 'products', id));
+          console.log('✅ Produk berhasil dihapus dari Cloud Firestore:', id);
+        } catch (fErr) {
+          console.warn('Firestore delete notice:', fErr.message);
+        }
+      }
+
+      // 2. Hapus dari backend lokal jika tersedia
+      try {
+        await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      } catch (apiErr) {
+        console.warn('API backend delete notice:', apiErr.message);
+      }
+
+      // 3. Update state langsung
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      console.error('Gagal menghapus produk:', err);
+      alert('Gagal menghapus produk: ' + err.message);
+    }
+  };
+
   const filteredProducts = products.filter((prod) => {
     if (selectedCategoryFilter === 'ALL') return true;
     return prod.category === selectedCategoryFilter;
@@ -471,11 +502,19 @@ export default function ProductsView() {
                             </button>
                             <button
                               className="btn btn-secondary btn-sm btn-icon"
-                              style={{ color: prod.active ? '#ef4444' : '#10b981' }}
-                              title={prod.active ? 'Nonaktifkan (Soft Delete)' : 'Aktifkan Kembali'}
+                              style={{ color: prod.active ? '#f59e0b' : '#10b981' }}
+                              title={prod.active ? 'Nonaktifkan Produk (Sembunyikan dari Pemesanan)' : 'Aktifkan Kembali Produk'}
                               onClick={() => handleToggleDeactivate(prod.id, prod.active)}
                             >
-                              {prod.active ? <Trash2 size={15} /> : <CheckCircle2 size={15} />}
+                              {prod.active ? <Power size={15} /> : <CheckCircle2 size={15} />}
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-sm btn-icon"
+                              style={{ color: '#ef4444' }}
+                              title="Hapus Permanen Produk"
+                              onClick={() => handleDeleteProduct(prod.id, prod.name)}
+                            >
+                              <Trash2 size={15} />
                             </button>
                           </div>
                         </td>
@@ -565,16 +604,24 @@ export default function ProductsView() {
                       className="btn btn-secondary btn-sm"
                       onClick={() => openEditModal(prod)}
                     >
-                      <Edit2 size={15} />
-                      <span>Edit Produk</span>
+                      <Edit2 size={14} />
+                      <span>Edit</span>
                     </button>
                     <button
                       className="btn btn-secondary btn-sm"
-                      style={{ color: prod.active ? '#ef4444' : '#10b981' }}
+                      style={{ color: prod.active ? '#f59e0b' : '#10b981' }}
                       onClick={() => handleToggleDeactivate(prod.id, prod.active)}
                     >
-                      {prod.active ? <Trash2 size={15} /> : <CheckCircle2 size={15} />}
-                      <span>{prod.active ? 'Nonaktifkan' : 'Aktifkan'}</span>
+                      {prod.active ? <Power size={14} /> : <CheckCircle2 size={14} />}
+                      <span>{prod.active ? 'Nonaktif' : 'Aktifkan'}</span>
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ color: '#ef4444', borderColor: '#fecaca' }}
+                      onClick={() => handleDeleteProduct(prod.id, prod.name)}
+                    >
+                      <Trash2 size={14} />
+                      <span>Hapus</span>
                     </button>
                   </div>
                 </div>

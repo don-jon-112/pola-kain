@@ -360,12 +360,12 @@ app.put('/api/products/:id', (req, res) => {
   res.json({ ...updatedProduct, sizes: updatedSizes });
 });
 
-// Soft delete
+// Permanent delete product
 app.delete('/api/products/:id', (req, res) => {
   const { id } = req.params;
-  const updated = db.update('products', id, { active: false, updated_at: new Date().toISOString() });
-  if (!updated) return res.status(404).json({ error: 'Produk tidak ditemukan' });
-  res.json({ message: 'Produk berhasil dinonaktifkan (soft delete)', product: updated });
+  const deleted = db.delete('products', id);
+  if (!deleted) return res.status(404).json({ error: 'Produk tidak ditemukan' });
+  res.json({ message: 'Produk berhasil dihapus secara permanen', success: true });
 });
 
 // -----------------------------------------------------------------------------

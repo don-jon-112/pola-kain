@@ -167,26 +167,29 @@ export default function InventoryView() {
               onClick={() => setShowItemModal(true)}
             >
               <Plus size={16} />
-              <span>Tambah Bahan / Item</span>
+              <span className="desktop-text">Tambah Bahan / Item</span>
+              <span className="mobile-text">Tambah Bahan</span>
             </button>
           </div>
         </div>
 
         {/* Tab Switcher */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+        <div className="order-view-switcher">
           <button
-            className={`btn btn-sm ${activeTab === 'stock' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn btn-sm order-view-switcher-btn ${activeTab === 'stock' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('stock')}
           >
-            <Boxes size={15} />
-            <span>Katalog Stok Bahan ({items.length})</span>
+            <Boxes size={15} style={{ flexShrink: 0 }} />
+            <span className="desktop-text">Katalog Stok Bahan ({items.length})</span>
+            <span className="mobile-text">Stok Bahan ({items.length})</span>
           </button>
           <button
-            className={`btn btn-sm ${activeTab === 'movements' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn btn-sm order-view-switcher-btn ${activeTab === 'movements' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('movements')}
           >
-            <History size={15} />
-            <span>Log Mutasi Stok ({movements.length})</span>
+            <History size={15} style={{ flexShrink: 0 }} />
+            <span className="desktop-text">Log Mutasi Stok ({movements.length})</span>
+            <span className="mobile-text">Log Mutasi ({movements.length})</span>
           </button>
         </div>
 
@@ -328,7 +331,8 @@ export default function InventoryView() {
                       onClick={() => openMovementDialog(it, 'PURCHASE')}
                     >
                       <ArrowDownRight size={14} />
-                      <span>Catat Stok Masuk</span>
+                      <span className="desktop-text">Catat Stok Masuk</span>
+                      <span className="mobile-text">Stok Masuk</span>
                     </button>
                     <button
                       className="btn btn-secondary btn-sm"
@@ -336,7 +340,8 @@ export default function InventoryView() {
                       onClick={() => openMovementDialog(it, 'PRODUCTION_USAGE')}
                     >
                       <ArrowUpRight size={14} />
-                      <span>Catat Pemakaian</span>
+                      <span className="desktop-text">Catat Pemakaian</span>
+                      <span className="mobile-text">Pakai Stok</span>
                     </button>
                   </div>
                 </div>

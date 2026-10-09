@@ -172,7 +172,7 @@ export default function Sidebar({ currentView, setCurrentView, mobileOpen, setMo
                 {role === 'SUPER_ADMIN' ? 'Super Admin' : role === 'OWNER' ? 'Owner Konveksi' : 'Customer'}
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
               <button
                 onClick={() => setShowPasswordModal(true)}
                 className="btn-icon"

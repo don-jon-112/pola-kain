@@ -751,6 +751,33 @@ button, input, select, textarea {
   display: none !important;
 }
 
+/* Responsive Text & Switcher Utilities */
+.desktop-text {
+  display: inline;
+}
+
+.mobile-text {
+  display: none !important;
+}
+
+.order-view-switcher {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 12px;
+}
+
+.order-view-switcher-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* Mobile Data Card Component (Touch & Thumb Friendly) */
 .mobile-data-card {
   background: var(--bg-card);
@@ -1227,6 +1254,33 @@ button, input, select, textarea {
     flex-direction: column;
     gap: 12px;
     width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .desktop-text {
+    display: none !important;
+  }
+
+  .mobile-text {
+    display: inline !important;
+  }
+
+  .order-view-switcher {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .order-view-switcher-btn {
+    width: 100% !important;
+    padding: 8px 6px !important;
+    font-size: 0.8rem !important;
+    text-align: center !important;
+    justify-content: center !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 

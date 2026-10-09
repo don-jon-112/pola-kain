@@ -322,30 +322,24 @@ export default function OrdersView({ onNavigate, onViewOrder, onViewReceipt, onV
         </div>
 
         {/* MAIN VIEW SWITCHER: PER PO VS REKAP PER JENIS PRODUK */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '18px',
-            borderBottom: '1px solid #f1f5f9',
-            paddingBottom: '12px',
-          }}
-        >
+        <div className="order-view-switcher">
           <button
-            className={`btn btn-sm ${mainTab === 'orders' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn btn-sm order-view-switcher-btn ${mainTab === 'orders' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setMainTab('orders')}
           >
-            <ShoppingBag size={15} />
-            <span>Faktur / PO Pesanan ({orders.length})</span>
+            <ShoppingBag size={15} style={{ flexShrink: 0 }} />
+            <span className="desktop-text">Faktur / PO Pesanan ({orders.length})</span>
+            <span className="mobile-text">Faktur PO ({orders.length})</span>
           </button>
 
           <button
-            className={`btn btn-sm ${mainTab === 'products-summary' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn btn-sm order-view-switcher-btn ${mainTab === 'products-summary' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setMainTab('products-summary')}
             style={mainTab === 'products-summary' ? { background: '#4338ca', borderColor: '#4338ca' } : {}}
           >
-            <Package size={15} />
-            <span>Rekap Total per Jenis Produk ({productsSummary.length} Aktif)</span>
+            <Package size={15} style={{ flexShrink: 0 }} />
+            <span className="desktop-text">Rekap Total per Jenis Produk ({productsSummary.length} Aktif)</span>
+            <span className="mobile-text">Rekap Produk ({productsSummary.length})</span>
           </button>
         </div>
 

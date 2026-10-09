@@ -18,6 +18,8 @@ export default function ProductsView() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [productToDelete, setProductToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Form states
   const [name, setName] = useState('');
@@ -296,17 +298,16 @@ export default function ProductsView() {
     }
   };
 
-  const handleDeleteProduct = async (id, productName) => {
-    if (!window.confirm(`HAPUS PERMANEN produk "${productName}"?\n\nPerhatian: Produk ini akan dihapus secara permanen dari katalog dan database.`)) {
-      return;
-    }
+  const confirmDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setDeleting(true);
 
     try {
       // 1. Hapus langsung dari Cloud Firestore jika terhubung
       if (db) {
         try {
-          await deleteDoc(doc(db, 'products', id));
-          console.log('✅ Produk berhasil dihapus dari Cloud Firestore:', id);
+          await deleteDoc(doc(db, 'products', productToDelete.id));
+          console.log('✅ Produk berhasil dihapus dari Cloud Firestore:', productToDelete.id);
         } catch (fErr) {
           console.warn('Firestore delete notice:', fErr.message);
         }
@@ -314,16 +315,19 @@ export default function ProductsView() {
 
       // 2. Hapus dari backend lokal jika tersedia
       try {
-        await fetch(`/api/products/${id}`, { method: 'DELETE' });
+        await fetch(`/api/products/${productToDelete.id}`, { method: 'DELETE' });
       } catch (apiErr) {
         console.warn('API backend delete notice:', apiErr.message);
       }
 
       // 3. Update state langsung
-      setProducts((prev) => prev.filter((p) => p.id !== id));
+      setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id));
+      setProductToDelete(null);
     } catch (err) {
       console.error('Gagal menghapus produk:', err);
       alert('Gagal menghapus produk: ' + err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -512,7 +516,7 @@ export default function ProductsView() {
                               className="btn btn-secondary btn-sm btn-icon"
                               style={{ color: '#ef4444' }}
                               title="Hapus Permanen Produk"
-                              onClick={() => handleDeleteProduct(prod.id, prod.name)}
+                              onClick={() => setProductToDelete(prod)}
                             >
                               <Trash2 size={15} />
                             </button>
@@ -618,7 +622,7 @@ export default function ProductsView() {
                     <button
                       className="btn btn-secondary btn-sm"
                       style={{ color: '#ef4444', borderColor: '#fecaca' }}
-                      onClick={() => handleDeleteProduct(prod.id, prod.name)}
+                      onClick={() => setProductToDelete(prod)}
                     >
                       <Trash2 size={14} />
                       <span>Hapus</span>
@@ -875,6 +879,131 @@ export default function ProductsView() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus Produk Permanen */}
+      {productToDelete && (
+        <div className="modal-overlay" style={{ zIndex: 120 }}>
+          <div
+            className="modal-content"
+            style={{
+              maxWidth: '460px',
+              border: '1px solid #fee2e2',
+              boxShadow: '0 25px 50px -12px rgba(239, 68, 68, 0.25)',
+            }}
+          >
+            <div
+              className="modal-header"
+              style={{
+                borderBottom: '1px solid #fef2f2',
+                padding: '20px 24px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '12px',
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Trash2 size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Hapus Produk Permanen?
+                  </h3>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                    Konfirmasi penghapusan katalog produk
+                  </div>
+                </div>
+              </div>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setProductToDelete(null)}
+                disabled={deleting}
+                style={{ padding: '6px' }}
+                title="Tutup dialog"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ padding: '20px 24px' }}>
+              <p style={{ fontSize: '0.925rem', color: '#334155', lineHeight: '1.5', margin: 0 }}>
+                Apakah Anda yakin ingin menghapus produk{' '}
+                <strong style={{ color: '#0f172a' }}>"{productToDelete.name}"</strong> (
+                <span className="font-mono" style={{ fontWeight: 600 }}>{productToDelete.code}</span>)?
+              </p>
+
+              <div
+                style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  marginTop: '16px',
+                  display: 'flex',
+                  gap: '10px',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <AlertCircle size={18} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: '0.8rem', color: '#991b1b', lineHeight: '1.4' }}>
+                  <strong>Perhatian:</strong> Data produk dan seluruh varian harganya akan dihapus secara permanen dari Cloud Firestore dan sistem. Tindakan ini tidak dapat dibatalkan.
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="modal-footer"
+              style={{
+                background: '#f8fafc',
+                borderTop: '1px solid #f1f5f9',
+                padding: '14px 24px',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+              }}
+            >
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setProductToDelete(null)}
+                disabled={deleting}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{
+                  background: '#dc2626',
+                  borderColor: '#dc2626',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+                onClick={confirmDeleteProduct}
+                disabled={deleting}
+              >
+                <Trash2 size={15} />
+                <span>{deleting ? 'Menghapus...' : 'Ya, Hapus Permanen'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

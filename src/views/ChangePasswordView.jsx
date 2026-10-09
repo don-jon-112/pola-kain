@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { KeyRound, ShieldAlert, CheckCircle, ArrowRight, X, Eye, EyeOff, Lock } from 'lucide-react';
 import { db } from '../services/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { hashPassword, verifyPassword } from '../utils/crypto';
 
 export default function ChangePasswordView({ onClose }) {
@@ -58,52 +58,93 @@ export default function ChangePasswordView({ onClose }) {
     setLoading(true);
     try {
       let isOldPasswordVerified = false;
+      let targetDocRef = null;
 
       // 1. Verifikasi kecocokan password lama ke Cloud Firestore
-      if (db && user?.id) {
+      if (db) {
         try {
-          const userDocRef = doc(db, 'users', user.id);
-          const snap = await getDoc(userDocRef);
-          if (snap.exists()) {
-            const currentData = snap.data();
-            const isMatch = await verifyPassword(cleanOld, currentData.password);
-            if (!isMatch) {
-              throw new Error('Password lama tidak sesuai. Silakan periksa kembali password Anda.');
+          // Cari dokumen di Firestore: coba direct doc(user.id), fallback query username / email
+          if (user?.id) {
+            const directRef = doc(db, 'users', user.id);
+            const snap = await getDoc(directRef);
+            if (snap.exists()) {
+              targetDocRef = directRef;
+              const currentData = snap.data();
+              const isMatch = await verifyPassword(cleanOld, currentData.password);
+              if (!isMatch) {
+                throw new Error('Password lama tidak sesuai. Silakan periksa kembali password Anda.');
+              }
+              isOldPasswordVerified = true;
             }
-            isOldPasswordVerified = true;
+          }
+
+          if (!isOldPasswordVerified && user?.username) {
+            const qUser = query(collection(db, 'users'), where('username', '==', user.username.trim().toLowerCase()));
+            const snapUser = await getDocs(qUser);
+            if (!snapUser.empty) {
+              targetDocRef = snapUser.docs[0].ref;
+              const currentData = snapUser.docs[0].data();
+              const isMatch = await verifyPassword(cleanOld, currentData.password);
+              if (!isMatch) {
+                throw new Error('Password lama tidak sesuai. Silakan periksa kembali password Anda.');
+              }
+              isOldPasswordVerified = true;
+            }
+          }
+
+          if (!isOldPasswordVerified && user?.email) {
+            const qEmail = query(collection(db, 'users'), where('email', '==', user.email.trim().toLowerCase()));
+            const snapEmail = await getDocs(qEmail);
+            if (!snapEmail.empty) {
+              targetDocRef = snapEmail.docs[0].ref;
+              const currentData = snapEmail.docs[0].data();
+              const isMatch = await verifyPassword(cleanOld, currentData.password);
+              if (!isMatch) {
+                throw new Error('Password lama tidak sesuai. Silakan periksa kembali password Anda.');
+              }
+              isOldPasswordVerified = true;
+            }
           }
         } catch (fErr) {
           if (fErr.message.includes('Password lama tidak sesuai')) {
             throw fErr;
           }
-          console.warn('Firestore read check skipped/offline:', fErr.message);
+          console.warn('Firestore password check bypassed/offline:', fErr.message);
         }
       }
 
-      // 2. Verifikasi dan kirim ke backend API Express
+      // 2. Sinkronkan ke backend API Express (jika tersedia / jika belum diverifikasi di Firestore)
       try {
         const res = await fetch('/api/auth/change-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: user.id,
+            userId: user?.id,
             oldPassword: cleanOld,
             newPassword: cleanNew,
           }),
         });
 
-        const text = await res.text();
-        let apiData = {};
-        try {
-          apiData = text ? JSON.parse(text) : {};
-        } catch {
-          apiData = {};
-        }
+        if (res.ok) {
+          isOldPasswordVerified = true;
+        } else {
+          const text = await res.text();
+          let apiData = {};
+          try {
+            apiData = text ? JSON.parse(text) : {};
+          } catch {
+            apiData = {};
+          }
 
-        if (!res.ok) {
-          throw new Error(apiData.error || 'Password lama tidak sesuai. Silakan masukkan password yang benar.');
+          // Jika backend secara spesifik menolak karena password lama salah dan belum diverifikasi Firestore
+          if (res.status === 400 && apiData.error && !isOldPasswordVerified) {
+            throw new Error(apiData.error);
+          }
+          // Jika status 500/502 (backend server offline / proxy error), jangan lemparkan pesan password salah!
+          if (!isOldPasswordVerified) {
+            console.warn('API backend unreachable/offline (status ' + res.status + ')');
+          }
         }
-        isOldPasswordVerified = true;
       } catch (apiErr) {
         if (
           apiErr.message.includes('Password lama') ||
@@ -113,26 +154,28 @@ export default function ChangePasswordView({ onClose }) {
         ) {
           throw apiErr;
         }
-        console.warn('API backend offline, melanjutkan update Firestore...');
+        console.warn('API backend offline/tidak merespons:', apiErr.message);
       }
 
-      // Jika password lama tidak terverifikasi sama sekali
+      // Jika password lama sama sekali tidak terverifikasi baik di Firestore maupun di Backend
       if (!isOldPasswordVerified) {
         throw new Error('Password lama tidak dapat diverifikasi. Pastikan password yang Anda masukkan benar.');
       }
 
-      // 3. Simpan password baru yang terenkripsi ke Firestore
-      if (db && user?.id) {
+      // 3. Simpan password baru yang terenkripsi ke Cloud Firestore
+      if (db) {
         try {
           const hashedPassword = await hashPassword(cleanNew);
-          const userDocRef = doc(db, 'users', user.id);
-          await updateDoc(userDocRef, {
-            password: hashedPassword,
-            must_change_password: false,
-            updated_at: new Date().toISOString(),
-          });
+          const finalDocRef = targetDocRef || (user?.id ? doc(db, 'users', user.id) : null);
+          if (finalDocRef) {
+            await updateDoc(finalDocRef, {
+              password: hashedPassword,
+              must_change_password: false,
+              updated_at: new Date().toISOString(),
+            });
+          }
         } catch (fErr) {
-          console.warn('Firestore update password:', fErr.message);
+          console.warn('Firestore update password error:', fErr.message);
         }
       }
 

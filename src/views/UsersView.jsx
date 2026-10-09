@@ -170,10 +170,12 @@ export default function UsersView() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            id: newUserId,
             username: cleanUsername,
             email: cleanEmail,
             name: cleanName,
             role,
+            initialPassword,
             customer_id: role === 'CUSTOMER' ? customerId : null,
           }),
         });
@@ -234,7 +236,11 @@ export default function UsersView() {
 
       // 2. Kirim ke backend jika online
       try {
-        await fetch(`/api/users/${userId}/reset-password`, { method: 'PUT' });
+        await fetch(`/api/users/${userId}/reset-password`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tempPassword }),
+        });
       } catch (apiErr) {
         console.warn('API reset-password offline');
       }

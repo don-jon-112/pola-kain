@@ -144,6 +144,7 @@ export function AuthProvider({ children }) {
             }
 
             const { password: _, ...safeUser } = userDoc;
+            safeUser.id = userDoc.id || snap.docs[0].id;
             setUser(safeUser);
             setCustomer(null);
             setMustChangePassword(Boolean(userDoc.must_change_password));

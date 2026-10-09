@@ -122,7 +122,7 @@ app.get('/api/users', (req, res) => {
 });
 
 app.post('/api/users', async (req, res) => {
-  const { username, email, name, role, customer_id } = req.body;
+  const { id, username, email, name, role, customer_id, initialPassword } = req.body;
   if (!username || !email || !name || !role) {
     return res.status(400).json({ error: 'Data user wajib diisi lengkap' });
   }
@@ -140,12 +140,12 @@ app.post('/api/users', async (req, res) => {
     return res.status(400).json({ error: 'Username atau Email sudah terdaftar' });
   }
 
-  // Generate initial password dan enkripsi dengan bcrypt
-  const initialPassword = 'User' + Math.floor(1000 + Math.random() * 9000);
-  const hashedPassword = await bcrypt.hash(initialPassword, 10);
+  // Gunakan initial password dari request jika ada, atau buat yang baru
+  const finalPassword = initialPassword || ('User' + Math.floor(1000 + Math.random() * 9000));
+  const hashedPassword = await bcrypt.hash(finalPassword, 10);
 
   const newUser = {
-    id: generateId('usr'),
+    id: id || generateId('usr'),
     username: cleanUsername,
     email: cleanEmail,
     password: hashedPassword,
@@ -161,8 +161,8 @@ app.post('/api/users', async (req, res) => {
   const { password: _, ...safeUser } = newUser;
   res.status(201).json({
     user: safeUser,
-    generatedPassword: initialPassword,
-    message: `User berhasil dibuat dengan initial password: ${initialPassword}`,
+    generatedPassword: finalPassword,
+    message: `User berhasil dibuat dengan initial password: ${finalPassword}`,
   });
 });
 
@@ -171,7 +171,7 @@ app.put('/api/users/:id/reset-password', async (req, res) => {
   const user = db.find('users', (u) => u.id === id);
   if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
 
-  const tempPassword = 'Reset' + Math.floor(1000 + Math.random() * 9000);
+  const tempPassword = req.body?.tempPassword || ('Reset' + Math.floor(1000 + Math.random() * 9000));
   const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
   db.update('users', id, {

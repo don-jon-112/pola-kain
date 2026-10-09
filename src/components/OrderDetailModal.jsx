@@ -56,19 +56,29 @@ export default function OrderDetailModal({
   return (
     <div className="modal-overlay">
       <div className="modal-content modal-lg">
-        <div className="modal-header">
-          <div>
-            <div className="modal-title">
-              Detail PO: <span className="font-mono text-primary">{order.order_number}</span>
+        <div className="modal-header order-detail-header-responsive">
+          <div className="order-detail-header-main">
+            <div className="order-detail-title-wrapper">
+              <div className="modal-title order-detail-title-text">
+                Detail PO: <span className="font-mono text-primary">{order.order_number}</span>
+              </div>
+              <div className="order-detail-date-text">
+                Dibuat pada {formatDateTime(order.created_at)}
+              </div>
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
-              Dibuat pada {formatDateTime(order.created_at)}
-            </div>
+            <button
+              className="btn btn-secondary btn-sm order-detail-close-btn"
+              onClick={onClose}
+              aria-label="Tutup"
+            >
+              <X size={16} />
+            </button>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+
+          <div className="order-detail-header-buttons">
             {isOwnerOrAdmin && hasRemainingItems && onOpenPartialShipment && (
               <button
-                className="btn btn-primary btn-sm"
+                className="btn btn-primary btn-sm order-detail-btn-action"
                 onClick={() => onOpenPartialShipment(order)}
                 title="Kirim barang bertahap untuk PO ini"
               >
@@ -76,11 +86,19 @@ export default function OrderDetailModal({
                 <span>Kirim Bertahap</span>
               </button>
             )}
-            <button className="btn btn-secondary btn-sm" onClick={() => onViewReceipt(order)}>
+            <button
+              className="btn btn-secondary btn-sm order-detail-btn-action"
+              onClick={() => onViewReceipt(order)}
+              title="Lihat Bukti PO"
+            >
               <Printer size={15} />
               <span>Bukti PO</span>
             </button>
-            <button className="btn btn-secondary btn-sm" onClick={onClose}>
+            <button
+              className="btn btn-secondary btn-sm order-detail-desktop-close"
+              onClick={onClose}
+              aria-label="Tutup"
+            >
               <X size={15} />
             </button>
           </div>
@@ -141,7 +159,7 @@ export default function OrderDetailModal({
           </div>
 
           {/* Customer & Info Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px', marginBottom: '20px' }}>
             <div className="card" style={{ padding: '16px' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
                 Informasi Customer

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db, ensureDefaultAdminInFirestore, ensureDefaultCustomersInFirestore } from '../services/firebase';
+import { db, ensureDefaultAdminInFirestore } from '../services/firebase';
 import { collection, getDocs, getDoc, query, where, doc, updateDoc } from 'firebase/firestore';
 import { verifyPassword, hashPassword, isHashed } from '../utils/crypto';
 
@@ -52,11 +52,10 @@ export function AuthProvider({ children }) {
     localStorage.setItem('konveksi_must_change_pw', String(mustChangePassword));
   }, [mustChangePassword]);
 
-  // When Firebase is configured, auto-seed default admin & customers if Firestore is empty
+  // When Firebase is configured, auto-seed default admin if users collection is empty
   useEffect(() => {
     if (db) {
       ensureDefaultAdminInFirestore();
-      ensureDefaultCustomersInFirestore();
     }
   }, []);
 

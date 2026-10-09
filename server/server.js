@@ -215,6 +215,19 @@ app.put('/api/users/:id/toggle-active', (req, res) => {
   res.json(updated);
 });
 
+app.put('/api/users/:id/customer', (req, res) => {
+  const { id } = req.params;
+  const { customer_id } = req.body;
+  const user = db.find('users', (u) => u.id === id);
+  if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
+
+  const updated = db.update('users', id, {
+    customer_id: customer_id || null,
+    updated_at: new Date().toISOString(),
+  });
+  res.json({ message: 'Lembaga customer berhasil diperbarui', user: updated });
+});
+
 // -----------------------------------------------------------------------------
 // CUSTOMERS
 // -----------------------------------------------------------------------------

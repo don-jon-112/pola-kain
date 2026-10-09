@@ -133,57 +133,6 @@ export const COLLECTIONS = {
   FINANCE: 'financial_transactions',
 };
 
-// Initial Default Customers Data
-export const DEFAULT_CUSTOMERS = [
-  {
-    id: 'cust_01',
-    code: 'CST-001',
-    name: 'SMP Harapan Bangsa',
-    pic: 'Ibu Lina (Kesiswaan)',
-    phone: '081234567890',
-    email: 'admin@smpharapan.sch.id',
-    address: 'Jl. Merdeka No. 45, Jakarta Selatan',
-    created_at: '2026-10-02T09:00:00Z',
-  },
-  {
-    id: 'cust_02',
-    code: 'CST-002',
-    name: 'SD Pertiwi 01',
-    pic: 'Pak Joko (Kepala Tata Usaha)',
-    phone: '081398765432',
-    email: 'sdpertiwi@gmail.com',
-    address: 'Jl. Melati Raya No. 12, Jakarta Timur',
-    created_at: '2026-10-07T10:00:00Z',
-  },
-  {
-    id: 'cust_03',
-    code: 'CST-003',
-    name: 'SMA Negeri 5 Unggulan',
-    pic: 'Ibu Ratna',
-    phone: '085711223344',
-    email: 'sman5@sch.id',
-    address: 'Jl. Pemuda No. 88, Bekasi',
-    created_at: '2026-10-08T11:00:00Z',
-  },
-];
-
-// Auto-seed default customers if customers collection is empty in Firestore
-export const ensureDefaultCustomersInFirestore = async () => {
-  if (!db) return;
-  try {
-    const custColl = collection(db, 'customers');
-    const snap = await getDocs(custColl);
-    if (snap.empty) {
-      console.log('🌱 Firestore customers collection is empty. Seeding default customers...');
-      for (const cust of DEFAULT_CUSTOMERS) {
-        await setDoc(doc(db, 'customers', cust.id), cust);
-      }
-      console.log('✅ Default customers successfully seeded to Firestore!');
-    }
-  } catch (err) {
-    console.warn('Note on Firestore customers check/seed:', err.message);
-  }
-};
 
 // Auto-seed default admin accounts if users collection is empty in Firestore
 export const ensureDefaultAdminInFirestore = async () => {

@@ -11,9 +11,10 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Building2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { db, DEFAULT_CUSTOMERS, ensureDefaultCustomersInFirestore } from '../services/firebase';
+import { db } from '../services/firebase';
 import { doc, updateDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { hashPassword } from '../utils/crypto';
 
@@ -56,6 +57,22 @@ export default function UsersView() {
   const [customPasswordLoading, setCustomPasswordLoading] = useState(false);
   const [customPasswordError, setCustomPasswordError] = useState('');
 
+  // Ganti Lembaga Customer states (Khusus SUPER_ADMIN)
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const [selectedUserForCustomer, setSelectedUserForCustomer] = useState(null);
+  const [targetCustomerId, setTargetCustomerId] = useState('');
+  const [isNewCustomerInModal, setIsNewCustomerInModal] = useState(false);
+  const [newCustName, setNewCustName] = useState('');
+  const [newCustPic, setNewCustPic] = useState('');
+  const [newCustPhone, setNewCustPhone] = useState('');
+  const [changeCustomerLoading, setChangeCustomerLoading] = useState(false);
+  const [changeCustomerError, setChangeCustomerError] = useState('');
+
+  const getCustomerInfo = (cid) => {
+    if (!cid) return null;
+    return customers.find((c) => c.id === cid);
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -75,32 +92,31 @@ export default function UsersView() {
 
         try {
           const cSnap = await getDocs(collection(db, 'customers'));
-          if (!cSnap.empty) {
-            cList = cSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          }
+          // Ambil apa adanya dari Firestore. Jika user telah menghapus customer, data tetap kosong dan TIDAK di-generate ulang
+          cList = cSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
         } catch (cErr) {
           console.warn('Firestore fetch customers:', cErr.message);
         }
       }
 
-      // 2. Ambil dari backend lokal jika Firestore belum ada data atau untuk melengkapi
-      try {
-        const uRes = await fetch('/api/users');
-        const text = await uRes.text();
-        const data = safeParseJson(text, null);
-        if (Array.isArray(data) && uList.length === 0) {
-          uList = data;
+      // 2. Ambil dari backend lokal HANYA jika Firestore tidak digunakan
+      if (!db) {
+        try {
+          const uRes = await fetch('/api/users');
+          const text = await uRes.text();
+          const data = safeParseJson(text, null);
+          if (Array.isArray(data)) {
+            uList = data;
+          }
+        } catch (apiErr) {
+          // Backend offline
         }
-      } catch (apiErr) {
-        // Backend offline, fallback ke Firestore
-      }
 
-      if (cList.length === 0) {
         try {
           const cRes = await fetch('/api/customers');
           const text = await cRes.text();
           const data = safeParseJson(text, []);
-          if (Array.isArray(data) && data.length > 0) {
+          if (Array.isArray(data)) {
             cList = data;
           }
         } catch (cErr) {
@@ -108,22 +124,12 @@ export default function UsersView() {
         }
       }
 
-      // 3. Fallback jika data customers masih kosong (misal database fresh)
-      if (cList.length === 0) {
-        cList = [...DEFAULT_CUSTOMERS];
-        if (db) {
-          try {
-            await ensureDefaultCustomersInFirestore();
-          } catch (seedErr) {
-            console.warn('Auto seed customers error:', seedErr);
-          }
-        }
-      }
-
       setUsers(uList);
       setCustomers(cList);
       if (cList.length > 0) {
         setCustomerId((prev) => (prev && prev !== '__NEW__' ? prev : cList[0].id));
+      } else {
+        setCustomerId('__NEW__');
       }
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -141,8 +147,9 @@ export default function UsersView() {
     setEmail('');
     setName('');
     setRole('CUSTOMER');
-    setCustomerId(customers.length > 0 ? customers[0].id : '__NEW__');
-    setIsAddingNewCustomer(customers.length === 0);
+    const hasCustomers = customers.length > 0;
+    setIsAddingNewCustomer(!hasCustomers);
+    setCustomerId(hasCustomers ? customers[0].id : '__NEW__');
     setNewCustomerName('');
     setNewCustomerPic('');
     setNewCustomerPhone('');
@@ -180,7 +187,8 @@ export default function UsersView() {
 
       let assignedCustomerId = null;
       if (role === 'CUSTOMER') {
-        if (isAddingNewCustomer || customerId === '__NEW__') {
+        const needNewCustomer = customers.length === 0 || isAddingNewCustomer || customerId === '__NEW__';
+        if (needNewCustomer) {
           const cleanCustName = newCustomerName.trim();
           if (!cleanCustName) {
             throw new Error('Nama Lembaga / Sekolah baru wajib diisi untuk akun Pelanggan');
@@ -422,6 +430,120 @@ export default function UsersView() {
     }
   };
 
+  const openChangeCustomerModal = (targetUser) => {
+    if (!isSuperAdmin) {
+      alert('Hanya Super Admin yang berhak mengubah data lembaga pengguna.');
+      return;
+    }
+    setSelectedUserForCustomer(targetUser);
+    setTargetCustomerId(targetUser.customer_id || (customers.length > 0 ? customers[0].id : '__NEW__'));
+    setIsNewCustomerInModal(customers.length === 0);
+    setNewCustName('');
+    setNewCustPic('');
+    setNewCustPhone('');
+    setChangeCustomerError('');
+  };
+
+  const handleSaveCustomerChange = async (e) => {
+    e.preventDefault();
+    if (!isSuperAdmin) {
+      setChangeCustomerError('Hanya Super Admin yang berhak mengubah data lembaga');
+      return;
+    }
+    if (!selectedUserForCustomer) return;
+
+    try {
+      setChangeCustomerLoading(true);
+      setChangeCustomerError('');
+
+      let finalCustomerId = targetCustomerId;
+
+      // Jika mendaftarkan lembaga baru di dalam modal
+      if (customers.length === 0 || isNewCustomerInModal || targetCustomerId === '__NEW__') {
+        const cleanName = newCustName.trim();
+        if (!cleanName) {
+          throw new Error('Nama Lembaga / Sekolah baru wajib diisi');
+        }
+
+        const newId = 'cust_' + Date.now();
+        const newCode = 'CST-' + Math.floor(100 + Math.random() * 900);
+        const newObj = {
+          id: newId,
+          code: newCode,
+          name: cleanName,
+          pic: newCustPic.trim() || selectedUserForCustomer.name,
+          phone: newCustPhone.trim() || '',
+          email: selectedUserForCustomer.email || '',
+          created_at: new Date().toISOString(),
+        };
+
+        if (db) {
+          try {
+            await setDoc(doc(db, 'customers', newId), newObj);
+          } catch (fErr) {
+            console.warn('Firestore create customer:', fErr);
+          }
+        }
+
+        try {
+          await fetch('/api/customers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newObj),
+          });
+        } catch (apiErr) {
+          // offline
+        }
+
+        setCustomers((prev) => [...prev, newObj]);
+        finalCustomerId = newId;
+      }
+
+      if (!finalCustomerId) {
+        throw new Error('Silakan pilih lembaga yang ingin dihubungkan');
+      }
+
+      // 1. Update ke Firestore
+      if (db) {
+        try {
+          await updateDoc(doc(db, 'users', selectedUserForCustomer.id), {
+            customer_id: finalCustomerId,
+            updated_at: new Date().toISOString(),
+          });
+        } catch (fErr) {
+          console.warn('Firestore update user customer:', fErr);
+          if (fErr.code === 'permission-denied') {
+            throw new Error('Akses Firebase ditolak. Pastikan izin Firestore memadai.');
+          }
+        }
+      }
+
+      // 2. Update ke Backend Express jika online
+      try {
+        await fetch(`/api/users/${selectedUserForCustomer.id}/customer`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customer_id: finalCustomerId }),
+        });
+      } catch (apiErr) {
+        // offline
+      }
+
+      // 3. Update state lokal seketika
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === selectedUserForCustomer.id ? { ...u, customer_id: finalCustomerId } : u
+        )
+      );
+
+      setSelectedUserForCustomer(null);
+    } catch (err) {
+      setChangeCustomerError(err.message || 'Gagal mengubah lembaga pengguna');
+    } finally {
+      setChangeCustomerLoading(false);
+    }
+  };
+
   return (
     <div className="content-body">
       <div className="card">
@@ -489,6 +611,44 @@ export default function UsersView() {
                           <span className={`user-role-badge role-${u.role}`}>
                             {u.role}
                           </span>
+                          {u.role === 'CUSTOMER' && (
+                            <div style={{ marginTop: '6px' }}>
+                              {getCustomerInfo(u.customer_id) ? (
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    background: '#eff6ff',
+                                    color: '#1d4ed8',
+                                    fontSize: '0.75rem',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    fontWeight: 600,
+                                    border: '1px solid #bfdbfe',
+                                  }}
+                                  title={`ID Lembaga: ${u.customer_id}`}
+                                >
+                                  🏫 {getCustomerInfo(u.customer_id).name}
+                                </span>
+                              ) : (
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    fontSize: '0.725rem',
+                                    color: '#dc2626',
+                                    background: '#fef2f2',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #fecaca',
+                                    fontStyle: 'italic',
+                                  }}
+                                >
+                                  ⚠️ Belum Terhubung
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td>
                           {u.must_change_password ? (
@@ -509,7 +669,24 @@ export default function UsersView() {
                           )}
                         </td>
                         <td className="text-center">
-                          <div style={{ display: 'inline-flex', gap: '6px' }}>
+                          <div style={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {isSuperAdmin && u.role === 'CUSTOMER' && (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '4px 8px',
+                                  color: '#4f46e5',
+                                  borderColor: '#c7d2fe',
+                                  background: '#eef2ff',
+                                }}
+                                title="Ganti Lembaga / Sekolah untuk Customer ini"
+                                onClick={() => openChangeCustomerModal(u)}
+                              >
+                                <Building2 size={13} />
+                                <span>Ganti Lembaga</span>
+                              </button>
+                            )}
                             <button
                               className="btn btn-primary btn-sm"
                               style={{ fontSize: '0.75rem', padding: '4px 8px' }}
@@ -579,6 +756,22 @@ export default function UsersView() {
                         {u.must_change_password ? '🔒 Wajib Ganti' : '✓ Aman'}
                       </span>
                     </div>
+                    {u.role === 'CUSTOMER' && (
+                      <div className="mobile-data-card-field" style={{ gridColumn: 'span 2' }}>
+                        <span className="mobile-data-card-label">Lembaga Terhubung</span>
+                        <span className="mobile-data-card-val" style={{ fontSize: '0.825rem' }}>
+                          {getCustomerInfo(u.customer_id) ? (
+                            <span style={{ fontWeight: 700, color: '#1d4ed8' }}>
+                              🏫 {getCustomerInfo(u.customer_id).name} ({getCustomerInfo(u.customer_id).code || getCustomerInfo(u.customer_id).id})
+                            </span>
+                          ) : (
+                            <span style={{ color: '#ef4444', fontStyle: 'italic' }}>
+                              ⚠️ Belum Terhubung Lembaga
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    )}
                     <div className="mobile-data-card-field" style={{ gridColumn: 'span 2' }}>
                       <span className="mobile-data-card-label">Email Terdaftar</span>
                       <span className="mobile-data-card-val font-mono" style={{ fontSize: '0.825rem' }}>
@@ -588,6 +781,16 @@ export default function UsersView() {
                   </div>
 
                   <div className="mobile-data-card-actions">
+                    {isSuperAdmin && u.role === 'CUSTOMER' && (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        style={{ color: '#4f46e5', borderColor: '#c7d2fe', background: '#eef2ff' }}
+                        onClick={() => openChangeCustomerModal(u)}
+                      >
+                        <Building2 size={14} />
+                        <span>Ganti Lembaga</span>
+                      </button>
+                    )}
                     <button
                       className="btn btn-primary btn-sm"
                       onClick={() => {
@@ -777,7 +980,7 @@ export default function UsersView() {
                         </button>
                       </div>
 
-                      {!isAddingNewCustomer ? (
+                      {customers.length > 0 && !isAddingNewCustomer ? (
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <select
                             className="form-select"
@@ -806,6 +1009,11 @@ export default function UsersView() {
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {customers.length === 0 && (
+                            <div style={{ fontSize: '0.8rem', color: '#475569', background: '#f1f5f9', padding: '8px 12px', borderRadius: '6px' }}>
+                              Belum ada data lembaga terdaftar. Masukkan nama sekolah / instansi di bawah untuk mendaftarkan lembaga baru:
+                            </div>
+                          )}
                           <div className="form-group" style={{ marginBottom: 0 }}>
                             <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600 }}>
                               Nama Lembaga / Sekolah Baru <span style={{ color: '#ef4444' }}>*</span>
@@ -816,7 +1024,7 @@ export default function UsersView() {
                               placeholder="Contoh: SMA Negeri 1 Bintang"
                               value={newCustomerName}
                               onChange={(e) => setNewCustomerName(e.target.value)}
-                              required={isAddingNewCustomer}
+                              required={role === 'CUSTOMER'}
                             />
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -939,6 +1147,213 @@ export default function UsersView() {
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={customPasswordLoading}>
                   {customPasswordLoading ? 'Menyimpan...' : 'Simpan Password Baru'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: GANTI LEMBAGA UNTUK CUSTOMER (KHUSUS SUPER ADMIN) */}
+      {selectedUserForCustomer && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    background: '#e0e7ff',
+                    color: '#4338ca',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                  }}
+                >
+                  <Building2 size={20} />
+                </div>
+                <div>
+                  <div className="modal-title">Ganti Lembaga / Customer</div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Khusus Super Admin • Pengguna: <strong>{selectedUserForCustomer.name}</strong> (@{selectedUserForCustomer.username})
+                  </div>
+                </div>
+              </div>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setSelectedUserForCustomer(null)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCustomerChange}>
+              <div className="modal-body">
+                {changeCustomerError && (
+                  <div
+                    style={{
+                      background: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      color: '#b91c1c',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.825rem',
+                      marginBottom: '14px',
+                    }}
+                  >
+                    {changeCustomerError}
+                  </div>
+                )}
+
+                {/* Lembaga Saat Ini */}
+                <div
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    padding: '12px 14px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                    Lembaga Saat Ini Terhubung:
+                  </span>
+                  {getCustomerInfo(selectedUserForCustomer.customer_id) ? (
+                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>
+                      🏫 {getCustomerInfo(selectedUserForCustomer.customer_id).name}{' '}
+                      <span className="font-mono" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
+                        ({getCustomerInfo(selectedUserForCustomer.customer_id).code || getCustomerInfo(selectedUserForCustomer.customer_id).id})
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ color: '#ef4444', fontStyle: 'italic', fontSize: '0.875rem' }}>
+                      ⚠️ Belum terhubung ke data lembaga manapun
+                    </div>
+                  )}
+                </div>
+
+                {/* Pilihan Lembaga Baru */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    <label className="form-label" style={{ marginBottom: 0, fontWeight: 700 }}>
+                      Pilih Lembaga Baru
+                    </label>
+                    {customers.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: '0.75rem', padding: '2px 8px', height: 'auto' }}
+                        onClick={() => {
+                          const next = !isNewCustomerInModal;
+                          setIsNewCustomerInModal(next);
+                          if (next) setTargetCustomerId('__NEW__');
+                          else setTargetCustomerId(customers[0]?.id || '');
+                        }}
+                      >
+                        {isNewCustomerInModal ? '← Pilih yang Terdaftar' : '+ Lembaga Baru'}
+                      </button>
+                    )}
+                  </div>
+
+                  {customers.length > 0 && !isNewCustomerInModal ? (
+                    <div>
+                      <select
+                        className="form-select"
+                        value={targetCustomerId}
+                        onChange={(e) => {
+                          if (e.target.value === '__NEW__') {
+                            setIsNewCustomerInModal(true);
+                            setTargetCustomerId('__NEW__');
+                          } else {
+                            setTargetCustomerId(e.target.value);
+                          }
+                        }}
+                        required
+                      >
+                        <option value="">-- Pilih Lembaga Tujuan --</option>
+                        {customers.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.code || c.id}) {c.pic ? `- PIC: ${c.pic}` : ''}
+                          </option>
+                        ))}
+                        <option value="__NEW__">+ Daftarkan Lembaga / Sekolah Baru...</option>
+                      </select>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                        Pesanan dan faktur akun ini akan dialihkan ke lembaga yang dipilih.
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {customers.length === 0 && (
+                        <div style={{ fontSize: '0.8rem', color: '#475569', background: '#f1f5f9', padding: '8px 12px', borderRadius: '6px' }}>
+                          Belum ada data lembaga terdaftar. Masukkan nama sekolah / instansi di bawah untuk mendaftarkan lembaga baru:
+                        </div>
+                      )}
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                          Nama Lembaga / Sekolah Baru <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="Contoh: SMA Negeri 1 Bintang"
+                          value={newCustName}
+                          onChange={(e) => setNewCustName(e.target.value)}
+                          required
+                          autoFocus
+                        />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.8rem' }}>
+                            PIC / Kontak
+                          </label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Contoh: Pak Wahyu"
+                            value={newCustPic}
+                            onChange={(e) => setNewCustPic(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.8rem' }}>
+                            No. Telepon / WA
+                          </label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Contoh: 0812345678"
+                            value={newCustPhone}
+                            onChange={(e) => setNewCustPhone(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setSelectedUserForCustomer(null)}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={changeCustomerLoading}
+                >
+                  {changeCustomerLoading ? 'Menyimpan...' : 'Simpan Perubahan Lembaga'}
                 </button>
               </div>
             </form>

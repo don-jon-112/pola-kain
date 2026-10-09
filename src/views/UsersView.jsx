@@ -13,7 +13,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../services/firebase';
+import { db, DEFAULT_CUSTOMERS, ensureDefaultCustomersInFirestore } from '../services/firebase';
 import { doc, updateDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { hashPassword } from '../utils/crypto';
 
@@ -42,6 +42,10 @@ export default function UsersView() {
   const [name, setName] = useState('');
   const [role, setRole] = useState('CUSTOMER');
   const [customerId, setCustomerId] = useState('');
+  const [isAddingNewCustomer, setIsAddingNewCustomer] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerPic, setNewCustomerPic] = useState('');
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -68,6 +72,15 @@ export default function UsersView() {
         } catch (fErr) {
           console.warn('Firestore fetch users:', fErr.message);
         }
+
+        try {
+          const cSnap = await getDocs(collection(db, 'customers'));
+          if (!cSnap.empty) {
+            cList = cSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          }
+        } catch (cErr) {
+          console.warn('Firestore fetch customers:', cErr.message);
+        }
       }
 
       // 2. Ambil dari backend lokal jika Firestore belum ada data atau untuk melengkapi
@@ -82,20 +95,36 @@ export default function UsersView() {
         // Backend offline, fallback ke Firestore
       }
 
-      try {
-        const cRes = await fetch('/api/customers');
-        const text = await cRes.text();
-        const data = safeParseJson(text, []);
-        if (Array.isArray(data)) {
-          cList = data;
+      if (cList.length === 0) {
+        try {
+          const cRes = await fetch('/api/customers');
+          const text = await cRes.text();
+          const data = safeParseJson(text, []);
+          if (Array.isArray(data) && data.length > 0) {
+            cList = data;
+          }
+        } catch (cErr) {
+          // silent
         }
-      } catch (cErr) {
-        // silent
+      }
+
+      // 3. Fallback jika data customers masih kosong (misal database fresh)
+      if (cList.length === 0) {
+        cList = [...DEFAULT_CUSTOMERS];
+        if (db) {
+          try {
+            await ensureDefaultCustomersInFirestore();
+          } catch (seedErr) {
+            console.warn('Auto seed customers error:', seedErr);
+          }
+        }
       }
 
       setUsers(uList);
       setCustomers(cList);
-      if (cList.length > 0 && !customerId) setCustomerId(cList[0].id);
+      if (cList.length > 0) {
+        setCustomerId((prev) => (prev && prev !== '__NEW__' ? prev : cList[0].id));
+      }
     } catch (err) {
       console.error('Error fetching users:', err);
     } finally {
@@ -106,6 +135,21 @@ export default function UsersView() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleOpenCreateModal = () => {
+    setUsername('');
+    setEmail('');
+    setName('');
+    setRole('CUSTOMER');
+    setCustomerId(customers.length > 0 ? customers[0].id : '__NEW__');
+    setIsAddingNewCustomer(customers.length === 0);
+    setNewCustomerName('');
+    setNewCustomerPic('');
+    setNewCustomerPhone('');
+    setError('');
+    setCreatedResult(null);
+    setShowCreateModal(true);
+  };
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -134,6 +178,55 @@ export default function UsersView() {
         );
       }
 
+      let assignedCustomerId = null;
+      if (role === 'CUSTOMER') {
+        if (isAddingNewCustomer || customerId === '__NEW__') {
+          const cleanCustName = newCustomerName.trim();
+          if (!cleanCustName) {
+            throw new Error('Nama Lembaga / Sekolah baru wajib diisi untuk akun Pelanggan');
+          }
+          const newCustId = 'cust_' + Date.now();
+          const newCustCode = 'CST-' + Math.floor(100 + Math.random() * 900);
+          const newCustObj = {
+            id: newCustId,
+            code: newCustCode,
+            name: cleanCustName,
+            pic: newCustomerPic.trim() || cleanName,
+            phone: newCustomerPhone.trim() || '',
+            email: cleanEmail,
+            created_at: new Date().toISOString(),
+          };
+
+          // Simpan ke Firestore
+          if (db) {
+            try {
+              await setDoc(doc(db, 'customers', newCustId), newCustObj);
+            } catch (fErr) {
+              console.warn('Firestore create customer error:', fErr);
+            }
+          }
+
+          // Sinkronkan ke API backend jika online
+          try {
+            await fetch('/api/customers', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newCustObj),
+            });
+          } catch (cErr) {
+            // offline
+          }
+
+          setCustomers((prev) => [...prev, newCustObj]);
+          assignedCustomerId = newCustId;
+        } else {
+          if (!customerId) {
+            throw new Error('Silakan pilih data Lembaga / Customer yang akan dihubungkan');
+          }
+          assignedCustomerId = customerId;
+        }
+      }
+
       // Generate initial password & unique ID
       const initialPassword = 'User' + Math.floor(1000 + Math.random() * 9000);
       const hashedPassword = await hashPassword(initialPassword);
@@ -146,7 +239,7 @@ export default function UsersView() {
         name: cleanName,
         password: hashedPassword,
         role,
-        customer_id: role === 'CUSTOMER' ? customerId : null,
+        customer_id: assignedCustomerId,
         must_change_password: true,
         active: true,
         created_at: new Date().toISOString(),
@@ -176,7 +269,7 @@ export default function UsersView() {
             name: cleanName,
             role,
             initialPassword,
-            customer_id: role === 'CUSTOMER' ? customerId : null,
+            customer_id: assignedCustomerId,
           }),
         });
         const text = await res.text();
@@ -202,6 +295,10 @@ export default function UsersView() {
       setUsername('');
       setEmail('');
       setName('');
+      setIsAddingNewCustomer(false);
+      setNewCustomerName('');
+      setNewCustomerPic('');
+      setNewCustomerPhone('');
       fetchData();
     } catch (err) {
       const msg = err.message || '';
@@ -348,7 +445,7 @@ export default function UsersView() {
             </p>
           </div>
 
-          <button className="btn btn-primary btn-sm" onClick={() => { setCreatedResult(null); setShowCreateModal(true); }}>
+          <button className="btn btn-primary btn-sm" onClick={handleOpenCreateModal}>
             <Plus size={16} />
             <span>Buat Akun Baru</span>
           </button>
@@ -640,20 +737,119 @@ export default function UsersView() {
                   </div>
 
                   {role === 'CUSTOMER' && (
-                    <div className="form-group">
-                      <label className="form-label">Hubungkan ke Data Lembaga / Customer</label>
-                      <select
-                        className="form-select"
-                        value={customerId}
-                        onChange={(e) => setCustomerId(e.target.value)}
-                        required
+                    <div
+                      style={{
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '14px',
+                        marginBottom: '16px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '8px',
+                          gap: '8px',
+                          flexWrap: 'wrap',
+                        }}
                       >
-                        {customers.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} ({c.code}) - {c.pic}
-                          </option>
-                        ))}
-                      </select>
+                        <label className="form-label" style={{ marginBottom: 0, fontWeight: 700 }}>
+                          Hubungkan ke Data Lembaga / Customer
+                        </label>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ fontSize: '0.75rem', padding: '3px 8px', height: 'auto' }}
+                          onClick={() => {
+                            const nextState = !isAddingNewCustomer;
+                            setIsAddingNewCustomer(nextState);
+                            if (nextState) {
+                              setCustomerId('__NEW__');
+                            } else if (customers.length > 0) {
+                              setCustomerId(customers[0].id);
+                            }
+                          }}
+                        >
+                          {isAddingNewCustomer ? '← Pilih dari Daftar Lembaga' : '+ Daftarkan Lembaga Baru'}
+                        </button>
+                      </div>
+
+                      {!isAddingNewCustomer ? (
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <select
+                            className="form-select"
+                            value={customerId}
+                            onChange={(e) => {
+                              if (e.target.value === '__NEW__') {
+                                setIsAddingNewCustomer(true);
+                                setCustomerId('__NEW__');
+                              } else {
+                                setCustomerId(e.target.value);
+                              }
+                            }}
+                            required={role === 'CUSTOMER' && !isAddingNewCustomer}
+                          >
+                            <option value="">-- Pilih Lembaga / Customer --</option>
+                            {customers.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name} ({c.code || c.id}) {c.pic ? `- PIC: ${c.pic}` : ''}
+                              </option>
+                            ))}
+                            <option value="__NEW__">+ Daftarkan Lembaga / Sekolah Baru...</option>
+                          </select>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                            Hubungkan akun ini ke profil lembaga sekolah/instansi mitra agar pesanan & faktur tersinkronisasi.
+                          </span>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                              Nama Lembaga / Sekolah Baru <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder="Contoh: SMA Negeri 1 Bintang"
+                              value={newCustomerName}
+                              onChange={(e) => setNewCustomerName(e.target.value)}
+                              required={isAddingNewCustomer}
+                            />
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                              <label className="form-label" style={{ fontSize: '0.8rem' }}>
+                                PIC / Nama Kontak
+                              </label>
+                              <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Contoh: Ibu Rina (Kesiswaan)"
+                                value={newCustomerPic}
+                                onChange={(e) => setNewCustomerPic(e.target.value)}
+                              />
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                              <label className="form-label" style={{ fontSize: '0.8rem' }}>
+                                No. Telepon / WhatsApp
+                              </label>
+                              <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Contoh: 08123456789"
+                                value={newCustomerPhone}
+                                onChange={(e) => setNewCustomerPhone(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: '#4f46e5' }}>
+                            ✓ Data lembaga baru akan otomatis dibuat di sistem dan langsung dihubungkan ke akun ini.
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

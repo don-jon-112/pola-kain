@@ -147,7 +147,7 @@ export default function Sidebar({ currentView, setCurrentView, mobileOpen, setMo
           )}
 
           {/* SUPER ADMIN SPECIFIC */}
-          {(role === 'SUPER_ADMIN' || role === 'OWNER') && (
+          {role === 'SUPER_ADMIN' && (
             <>
               <div className="nav-section-title">Manajemen Akun</div>
               <button

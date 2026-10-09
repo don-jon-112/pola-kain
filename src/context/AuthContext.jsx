@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db, ensureDefaultAdminInFirestore } from '../services/firebase';
-import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
+import { db, ensureDefaultAdminInFirestore, ensureDefaultCustomersInFirestore } from '../services/firebase';
+import { collection, getDocs, getDoc, query, where, doc, updateDoc } from 'firebase/firestore';
 import { verifyPassword, hashPassword, isHashed } from '../utils/crypto';
 
 const AuthContext = createContext(null);
@@ -52,10 +52,11 @@ export function AuthProvider({ children }) {
     localStorage.setItem('konveksi_must_change_pw', String(mustChangePassword));
   }, [mustChangePassword]);
 
-  // When Firebase is configured, auto-seed default admin if Firestore is empty
+  // When Firebase is configured, auto-seed default admin & customers if Firestore is empty
   useEffect(() => {
     if (db) {
       ensureDefaultAdminInFirestore();
+      ensureDefaultCustomersInFirestore();
     }
   }, []);
 
@@ -146,9 +147,21 @@ export function AuthProvider({ children }) {
             const { password: _, ...safeUser } = userDoc;
             safeUser.id = userDoc.id || snap.docs[0].id;
             setUser(safeUser);
-            setCustomer(null);
+
+            let custData = null;
+            if (userDoc.customer_id) {
+              try {
+                const cDoc = await getDoc(doc(db, 'customers', userDoc.customer_id));
+                if (cDoc.exists()) {
+                  custData = { id: cDoc.id, ...cDoc.data() };
+                }
+              } catch (cErr) {
+                console.warn('Fetch customer on Firestore login:', cErr);
+              }
+            }
+            setCustomer(custData);
             setMustChangePassword(Boolean(userDoc.must_change_password));
-            return { user: safeUser };
+            return { user: safeUser, customer: custData };
           } else {
             throw new Error('Password salah. Silakan periksa kembali password Anda.');
           }

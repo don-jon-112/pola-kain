@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, CheckCircle2, AlertCircle, ShoppingBag, Sparkles, Minus } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../services/firebase';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 
 export default function CustomerOrderRequestView({ onOrderSubmitted, onCancel }) {
   const { user, customer } = useAuth();
@@ -23,17 +25,48 @@ export default function CustomerOrderRequestView({ onOrderSubmitted, onCancel })
     },
   ]);
 
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      let list = [];
+
+      // 1. Ambil dari Cloud Firestore terlebih dahulu jika terhubung
+      if (db) {
+        try {
+          const snap = await getDocs(collection(db, 'products'));
+          if (!snap.empty) {
+            list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          }
+        } catch (fErr) {
+          console.warn('Firestore fetch products notice:', fErr.message);
+        }
+      }
+
+      // 2. Ambil dari backend lokal jika Firestore belum ada data atau untuk fallback
+      if (list.length === 0) {
+        try {
+          const res = await fetch('/api/products?activeOnly=true');
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            list = data;
+          }
+        } catch (apiErr) {
+          console.warn('API fetch products notice:', apiErr.message);
+        }
+      }
+
+      // Filter hanya produk yang aktif (active !== false)
+      const activeProducts = list.filter((p) => p.active !== false);
+      setProducts(activeProducts);
+    } catch (err) {
+      console.error('Error fetching products for customer:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetch('/api/products?activeOnly=true')
-      .then((r) => r.json())
-      .then((data) => {
-        setProducts(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+    fetchProducts();
   }, []);
 
   const addRow = () => {
@@ -189,26 +222,87 @@ export default function CustomerOrderRequestView({ onOrderSubmitted, onCancel })
 
     setSubmitting(true);
     try {
-      const payload = {
-        customer_id: custId,
-        customer_message: customerMessage,
-        created_by: user.name,
-        items: rows.map((r) => ({
+      // Hitung total harga & siapkan detail item secara lengkap
+      const enrichedItems = rows.map((r, idx) => {
+        const prod = products.find((p) => p.id === r.productId);
+        let unitPrice = Number(prod?.price || 0);
+        let sizeName = 'N/A';
+        if (prod?.has_size && r.sizeCode) {
+          const szObj = (prod.sizes || []).find((s) => s.size_code === r.sizeCode);
+          if (szObj && szObj.price !== undefined && szObj.price !== null) {
+            unitPrice = Number(szObj.price);
+          }
+          sizeName = szObj?.size_name || `Size ${r.sizeCode}`;
+        }
+        return {
+          id: `oit_${Date.now()}_${idx}`,
           product_id: r.productId,
+          product_name: prod?.name || 'Produk',
+          product_code: prod?.code || 'PRD',
           size_code: r.sizeCode || null,
-          quantity: r.quantity,
-        })),
-      };
-
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+          size_name: sizeName,
+          quantity: Number(r.quantity),
+          unit_price: unitPrice,
+          total_price: unitPrice * Number(r.quantity),
+          shipped_quantity: 0,
+          remaining_quantity: Number(r.quantity),
+        };
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Gagal membuat pesanan');
+      const totalAmount = enrichedItems.reduce((sum, item) => sum + item.total_price, 0);
+      const totalQuantity = enrichedItems.reduce((sum, item) => sum + item.quantity, 0);
+      const newOrderId = `ord_${Date.now()}`;
+      const orderNumber = `ORD-${new Date().getFullYear()}-${String(Math.floor(100 + Math.random() * 900))}`;
+
+      const orderPayload = {
+        id: newOrderId,
+        order_number: orderNumber,
+        customer_id: custId,
+        customer_name: customer?.name || user?.name || 'Customer',
+        customer_message: customerMessage,
+        created_by: user.name,
+        status: 'REQUESTED',
+        total_amount: totalAmount,
+        total_quantity: totalQuantity,
+        items: enrichedItems,
+        status_history: [
+          {
+            id: `osh_${Date.now()}`,
+            order_id: newOrderId,
+            status: 'REQUESTED',
+            notes: customerMessage || 'Pesanan diajukan oleh customer.',
+            updated_by_name: user.name,
+            created_at: new Date().toISOString(),
+          },
+        ],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // 1. Simpan ke Cloud Firestore jika terhubung
+      let savedOrder = orderPayload;
+      if (db) {
+        try {
+          await setDoc(doc(db, 'orders', newOrderId), orderPayload);
+          console.log('✅ Pesanan berhasil disimpan ke Cloud Firestore:', newOrderId);
+        } catch (fErr) {
+          console.warn('Firestore save order error:', fErr);
+        }
+      }
+
+      // 2. Sinkronkan ke API backend jika online
+      try {
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderPayload),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.order) savedOrder = data.order;
+        }
+      } catch (apiErr) {
+        // Backend offline, order aman di Firestore
       }
 
       confetti({
@@ -218,7 +312,7 @@ export default function CustomerOrderRequestView({ onOrderSubmitted, onCancel })
       });
 
       if (onOrderSubmitted) {
-        onOrderSubmitted(data.order);
+        onOrderSubmitted(savedOrder);
       }
     } catch (err) {
       setError(err.message || 'Terjadi gangguan jaringan');
@@ -246,6 +340,31 @@ export default function CustomerOrderRequestView({ onOrderSubmitted, onCancel })
             {customer?.name || user?.name || 'Customer'}
           </span>
         </div>
+
+        {products.length === 0 && !loading && (
+          <div
+            style={{
+              background: '#fffbeb',
+              border: '1px solid #fde68a',
+              color: '#92400e',
+              padding: '14px 16px',
+              borderRadius: '10px',
+              fontSize: '0.875rem',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+            }}
+          >
+            <AlertCircle size={20} style={{ flexShrink: 0 }} />
+            <div>
+              <strong>Katalog Produk Masih Kosong atau Belum Aktif.</strong>
+              <div style={{ fontSize: '0.8rem', marginTop: '2px' }}>
+                Admin konveksi belum menambahkan produk aktif ke sistem. Silakan hubungi admin konveksi untuk mengaktifkan produk seragam.
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div

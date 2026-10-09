@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getHumanStatusLabel } from '../components/OrderDetailModal';
+import { db } from '../services/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 export default function OrdersView({ onNavigate, onViewOrder, onViewReceipt, onViewDeliveryInvoice }) {
   const { user } = useAuth();
@@ -53,10 +55,41 @@ export default function OrdersView({ onNavigate, onViewOrder, onViewReceipt, onV
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const url = role === 'CUSTOMER' ? `/api/orders?customer_id=${user.customer_id}` : '/api/orders';
-      const res = await fetch(url);
-      const data = await res.json();
-      setOrders(data);
+      let list = [];
+
+      // 1. Ambil dari Cloud Firestore terlebih dahulu jika terhubung
+      if (db) {
+        try {
+          const snap = await getDocs(collection(db, 'orders'));
+          if (!snap.empty) {
+            list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          }
+        } catch (fErr) {
+          console.warn('Firestore fetch orders notice:', fErr.message);
+        }
+      }
+
+      // 2. Ambil dari backend lokal jika Firestore belum ada data atau untuk fallback
+      if (list.length === 0) {
+        try {
+          const url = role === 'CUSTOMER' ? `/api/orders?customer_id=${user.customer_id}` : '/api/orders';
+          const res = await fetch(url);
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            list = data;
+          }
+        } catch (apiErr) {
+          console.warn('API fetch orders notice:', apiErr.message);
+        }
+      }
+
+      if (role === 'CUSTOMER' && user.customer_id) {
+        list = list.filter((o) => o.customer_id === user.customer_id);
+      }
+
+      // Urutkan pesanan terbaru di atas
+      list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      setOrders(list);
     } catch (err) {
       console.error(err);
     } finally {
